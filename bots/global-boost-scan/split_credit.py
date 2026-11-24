@@ -278,6 +278,10 @@ def credit_splits(conn, log=print, fetch=None, dry_run=False, now=None):
     if gone and not dry_run:
         db.drop_credits(conn, gone)
 
+    if not dry_run:
+        # The day totals start counting through credits (d1_sync, db.credited_rows),
+        # the credits already written are recounted once; later ones queue their own.
+        res["recount_queued"] = db.queue_credit_recount_once(conn)
     rows = db.split_credit_candidates(conn, now - SPLIT_RETRY)
     if not rows:
         return res

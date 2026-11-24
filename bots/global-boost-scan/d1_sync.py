@@ -163,17 +163,17 @@ def build_full_sql(conn):
                        f"{q(r['event_id'])},{q(r['message'])});")
 
     # podcasts (aggregates joined with show metadata)
-    eg = db.effective_guid("b")
+    # Counted through db.credited_rows(): a split boost once per credited side.
     for a in conn.execute(f"""
-        SELECT {eg} AS guid,
-               COUNT(*) AS boost_count, COALESCE(SUM(b.sats),0) AS total_sats,
+        SELECT b.podcast_guid AS guid,
+               COUNT(DISTINCT b.event_id) AS boost_count, COALESCE(SUM(b.sats),0) AS total_sats,
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
                s.publisher_guid, s.description, s.newest_item_ts
-        FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-        WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
+        FROM {db.credited_rows()} b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
+        WHERE b.podcast_guid IS NOT NULL GROUP BY b.podcast_guid""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
         # from <image>); the show page falls back to it when `image` 404s. The
         # remote D1 `podcasts.artwork` column shipped out-of-band (ALTER + backfill),
@@ -201,10 +201,10 @@ def build_full_sql(conn):
                agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts,
                agg.first_boost_ts
         FROM episodes e
-        JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
+        JOIN (SELECT item_guid, COUNT(DISTINCT event_id) boost_count, COALESCE(SUM(sats),0) total_sats,
                      COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts,
                      MIN(created_at) first_boost_ts
-              FROM boosts WHERE item_guid IS NOT NULL AND {db.not_excluded('')}
+              FROM {db.credited_rows()} WHERE item_guid IS NOT NULL
               GROUP BY item_guid) agg
           ON agg.item_guid = e.item_guid
         LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid""").fetchall():
@@ -265,17 +265,16 @@ def _podcast_upsert_sql(conn, guid):
     Returns [] when the show has no publishable boost left — every caller reads
     that as "delete it", which is how an excluded show's D1 row goes away.
     """
-    eg = db.effective_guid("b")
     a = conn.execute(
-        f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
+        f"""SELECT b.podcast_guid AS guid, COUNT(DISTINCT b.event_id) AS boost_count,
                   COALESCE(SUM(b.sats),0) AS total_sats,
                   COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                   COUNT(DISTINCT b.item_guid) AS episode_count,
                   MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                   s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
                   s.publisher_guid, s.description, s.newest_item_ts
-           FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-           WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
+           FROM {db.credited_rows(podcast=True)} b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
+           GROUP BY b.podcast_guid""", (guid, guid)).fetchone()
     if not a:
         return []
     # `artwork` (second-chance art URL) is projected here and in the full load;
@@ -304,18 +303,19 @@ def _episode_upsert_sql(conn, item_guid):
     delta path — the row is there because a new boost landed on it — but it is the
     whole point on the reprojection path, where [] means "delete it".
     """
-    nx = db.not_excluded("")
     e = conn.execute(
         f"""SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
                   e.episode_number,e.enclosure_url,e.description, s.title AS show_title,
-                  (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS boost_count,
-                  (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS total_sats,
-                  (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS booster_count,
-                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS latest_ts,
-                  (SELECT MIN(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS first_boost_ts
+                  agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts,
+                  agg.first_boost_ts
            FROM episodes e
            LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
-           WHERE e.item_guid=?""", (item_guid,)).fetchone()
+           LEFT JOIN (SELECT COUNT(DISTINCT event_id) AS boost_count,
+                             COALESCE(SUM(sats),0) AS total_sats,
+                             COUNT(DISTINCT booster_pubkey) AS booster_count,
+                             MAX(created_at) AS latest_ts, MIN(created_at) AS first_boost_ts
+                      FROM {db.credited_rows(item=True)}) agg ON 1
+           WHERE e.item_guid=?""", (item_guid, item_guid, item_guid)).fetchone()
     if not e or not e["boost_count"]:
         return []
     out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
@@ -698,8 +698,8 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
     for r in conn.execute(
         f"""SELECT s.podcast_guid FROM shows s
             WHERE s.updated_at IS NOT NULL AND s.updated_at >= ?
-              AND EXISTS (SELECT 1 FROM boosts b
-                          WHERE {eg}=s.podcast_guid AND {db.not_excluded('b')})""",
+              AND EXISTS (SELECT 1 FROM {db.credited_rows()} b
+                          WHERE b.podcast_guid=s.podcast_guid)""",
             (since,)).fetchall():
         if r["podcast_guid"] in skip_pods:
             continue
@@ -710,8 +710,8 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
     for r in conn.execute(
         f"""SELECT e.item_guid FROM episodes e
            WHERE e.updated_at IS NOT NULL AND e.updated_at >= ?
-             AND EXISTS (SELECT 1 FROM boosts b
-                         WHERE b.item_guid=e.item_guid AND {db.not_excluded('b')})""",
+             AND EXISTS (SELECT 1 FROM {db.credited_rows()} b
+                         WHERE b.item_guid=e.item_guid)""",
             (since,)).fetchall():
         if r["item_guid"] in skip_items:
             continue
@@ -1071,11 +1071,10 @@ def cmd_rebuild_fts(args):
         "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title, show, description);",
         "CREATE VIRTUAL TABLE publishers_fts USING fts5(publisher_guid UNINDEXED, title);",
     ]
-    eg = db.effective_guid("b")
     for a in conn.execute(f"""
-        SELECT {eg} AS guid, s.title, s.author, s.description
-        FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-        WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
+        SELECT b.podcast_guid AS guid, s.title, s.author, s.description
+        FROM {db.credited_rows()} b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
+        WHERE b.podcast_guid IS NOT NULL GROUP BY b.podcast_guid""").fetchall():
         if a["title"] or a["author"] or a["description"]:
             stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author,description) VALUES ("
                          f"{q(a['guid'])},{q(a['title'])},{q(a['author'])},{q(a['description'])});")
@@ -1084,8 +1083,8 @@ def cmd_rebuild_fts(args):
         FROM episodes e
         LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
         WHERE (e.title IS NOT NULL OR s.title IS NOT NULL OR e.description IS NOT NULL)
-          AND EXISTS (SELECT 1 FROM boosts
-                      WHERE item_guid = e.item_guid AND {db.not_excluded('')})""").fetchall():
+          AND EXISTS (SELECT 1 FROM {db.credited_rows()} b
+                      WHERE b.item_guid = e.item_guid)""").fetchall():
         stmts.append("INSERT INTO episodes_fts (item_guid,title,show,description) VALUES ("
                      f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])},{q(e['description'])});")
     for r in db.publisher_rows(conn):

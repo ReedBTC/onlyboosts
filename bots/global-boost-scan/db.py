@@ -394,6 +394,35 @@ def effective_guid(alias="b"):
     return f"COALESCE({p}canonical_guid, {p}podcast_guid)"
 
 
+# ── what a total counts: the credited rows ────────────────────────────────────
+# ⚠️ EVERY AGGREGATE (podcasts / episodes total_sats, boost_count, booster_count,
+# episode_count, latest_ts, first_boost_ts) COUNTS THESE ROWS, NOT `boosts`. A
+# boost with value-time-split credits (split_credit.py) is one row per credit, at
+# the credit's sats, under the credit's guid and item; every other boost is one
+# row as it always was. The edge mirrors this SQL for its windowed charts, so a
+# change here is a change there (docs/data-pipeline.md).
+def credited_rows(podcast=False, item=False):
+    """A FROM-clause subquery `(...)`: event_id, booster_pubkey, created_at,
+    podcast_guid (effective), item_guid, sats. Exclusions already applied.
+
+    Two arms: boosts with no credits, as they are, and one row per credit. Pass
+    podcast=True or item=True to filter BOTH arms on a `?` the caller binds
+    TWICE; the filter sits inside each arm so the item lookups stay on their
+    indexes (a CASE column outside would scan every boost)."""
+    fb = (f" AND {effective_guid('b')} = ?" if podcast else "") + (" AND b.item_guid = ?" if item else "")
+    fc = (" AND c.podcast_guid = ?" if podcast else "") + (" AND c.item_guid = ?" if item else "")
+    return (f"""(SELECT b.event_id, b.booster_pubkey, b.created_at,
+                {effective_guid('b')} AS podcast_guid, b.item_guid, b.sats
+         FROM boosts b
+         WHERE {not_excluded('b')}{fb}
+           AND NOT EXISTS (SELECT 1 FROM boost_credits x WHERE x.event_id = b.event_id)
+         UNION ALL
+         SELECT b.event_id, b.booster_pubkey, b.created_at,
+                c.podcast_guid, c.item_guid, c.sats
+         FROM boost_credits c JOIN boosts b ON b.event_id = c.event_id
+         WHERE {not_excluded('b')}{fc})""")
+
+
 # ── the exclusion list ────────────────────────────────────────────────────────
 # Everything that reaches a reader is filtered here. Use this rather than writing
 # the flags by hand, so the one predicate is greppable. Two gates, two mechanisms:
@@ -1352,8 +1381,8 @@ def podroll_rows(conn):
     is a COALESCE, which no index can serve, so each one re-scans every boost.
     """
     return conn.execute(f"""
-        WITH boosted AS (SELECT DISTINCT {effective_guid('')} AS g FROM boosts
-                         WHERE podcast_guid IS NOT NULL AND {not_excluded('')})
+        WITH boosted AS (SELECT DISTINCT podcast_guid AS g FROM {credited_rows()}
+                         WHERE podcast_guid IS NOT NULL)
         SELECT p.source_guid, p.position, p.target_guid, p.target_url,
                p.target_title, p.target_medium,
                src.title AS src_title, src.image AS src_img, src.artwork AS src_art2,
@@ -1523,8 +1552,8 @@ def publisher_album_rows(conn):
     the one join both projections would read; podroll_rows one tier up (same
     boosted-CTE trick, same hint-loses-to-resolved-title rule downstream)."""
     return conn.execute(f"""
-        WITH boosted AS (SELECT DISTINCT {effective_guid('')} AS g FROM boosts
-                         WHERE podcast_guid IS NOT NULL AND {not_excluded('')})
+        WITH boosted AS (SELECT DISTINCT podcast_guid AS g FROM {credited_rows()}
+                         WHERE podcast_guid IS NOT NULL)
         SELECT a.publisher_guid, a.position, a.album_guid, a.album_url,
                a.album_title, a.album_medium,
                s.title AS alb_title, s.image AS alb_img, s.artwork AS alb_art2,
@@ -1862,10 +1891,16 @@ def write_credits(conn, rows, checks):
     podcast_guid, item_guid, sats, pct, method, checked_at) and record `checks`
     (event_id, checked_at, outcome). Every written row is un-synced, so the next
     D1 delta pushes it."""
+    events = sorted({r[0] for r in rows})
+    recount = _credit_recount_pairs(conn, events)          # the credits being replaced
     conn.executemany(
         """INSERT OR REPLACE INTO boost_credits
            (event_id, role, podcast_guid, item_guid, sats, pct, method, checked_at, d1_synced)
            VALUES (?,?,?,?,?,?,?,?,0)""", rows)
+    recount |= _credit_recount_pairs(conn, events)         # and the ones replacing them
+    if _has_table(conn, "d1_reproject"):
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES (?, ?)",
+                         sorted(recount))
     conn.executemany(
         """INSERT INTO split_checks (event_id, checked_at, outcome) VALUES (?,?,?)
            ON CONFLICT(event_id) DO UPDATE SET checked_at=excluded.checked_at,
@@ -1873,13 +1908,56 @@ def write_credits(conn, rows, checks):
     conn.commit()
 
 
+def _credit_recount_pairs(conn, event_ids):
+    """('podcast', guid) / ('episode', item) for every side a credit change moves
+    sats between: each credit row's guid and item, and the boost row's own. The
+    reproject queue recounts each from credited_rows() (and deletes a row nothing
+    is left on)."""
+    if not event_ids:
+        return set()
+    ph = ",".join("?" * len(event_ids))
+    out = set()
+    for g, i in conn.execute(
+            f"""SELECT podcast_guid, item_guid FROM boost_credits WHERE event_id IN ({ph})
+                UNION SELECT {effective_guid('b')}, b.item_guid FROM boosts b
+                WHERE b.event_id IN ({ph})""", list(event_ids) * 2):
+        if g:
+            out.add(("podcast", g))
+        if i:
+            out.add(("episode", i))
+    return out
+
+
+CREDIT_AGGREGATES_KEY = "credit_aggregates_queued"
+
+
+def queue_credit_recount_once(conn):
+    """The day aggregates start counting through credits, every guid an existing
+    credit names has to be recounted once; credits written after that queue their
+    own. Recorded in `meta` so it happens exactly once."""
+    if get_meta(conn, CREDIT_AGGREGATES_KEY):
+        return 0
+    events = [r[0] for r in conn.execute("SELECT DISTINCT event_id FROM boost_credits")]
+    pairs = set()
+    for i in range(0, len(events), 400):
+        pairs |= _credit_recount_pairs(conn, events[i:i + 400])
+    if _has_table(conn, "d1_reproject"):
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES (?, ?)", sorted(pairs))
+    set_meta(conn, CREDIT_AGGREGATES_KEY, str(int(time.time())))
+    conn.commit()
+    return len(pairs)
+
+
 def drop_credits(conn, event_ids):
     """Remove the credits of boosts that became excluded or duplicates, here and,
     through the reproject queue, in D1."""
+    recount = _credit_recount_pairs(conn, event_ids)
     conn.executemany("DELETE FROM boost_credits WHERE event_id=?", [(e,) for e in event_ids])
     if _has_table(conn, "d1_reproject"):
         conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES ('credit', ?)",
                          [(e,) for e in event_ids])
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES (?, ?)",
+                         sorted(recount))
     conn.commit()
 
 
