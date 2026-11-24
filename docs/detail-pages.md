@@ -456,7 +456,7 @@ and a seek line carrying a tick wherever a chapter or a song begins.
 
 - **The songs are the episode's `<podcast:valueTimeSplit>` windows**, read from
   the show's RSS by `/api/episode-songs` (`functions/_shared/time-splits.js`) and
-  named by our index first, Podcast Index second. Only a window with a
+  named by our index first, Podcast Index second (the episode record for the title, the album feed for the artist; a row shows "Song - Artist", or the title alone when no artist is known). Only a window with a
   `remoteItem` is a song; a window of inline recipients is counted and left
   alone. Measured 2026-11-24: Two For Tunestr's latest episode has 19, Homegrown
   Hits' 15, and the index names about half of each.

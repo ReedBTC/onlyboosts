@@ -92,6 +92,7 @@ console.log('\nThe endpoint:')
     if (u === 'https://host.example/feed.xml') return new Response(FEED, { headers: { 'Content-Type': 'application/rss+xml' } })
     if (u.startsWith('https://api.podcastindex.org/')) {
       piAsked.push(u)
+      if (u.includes('/podcasts/byguid') && u.includes('guid=album-b')) return Response.json({ feed: { title: 'Album B', author: 'Artist B' } })
       if (u.includes('guid=song-b')) return Response.json({ episode: { title: 'Song B', feedTitle: 'Album B', image: 'https://img.example/b.jpg' } })
       return Response.json({ status: 'false', description: 'Episode not found' })
     }
@@ -108,12 +109,16 @@ console.log('\nThe endpoint:')
   await check('Podcast Index names one the index does not, with no page', () => {
     assert.deepEqual([by['song-b'].title, by['song-b'].album, by['song-b'].indexed], ['Song B', 'Album B', false])
   })
+  await check('⚠️ the artist of a song the index does not know comes from its album feed', () =>
+    assert.equal(by['song-b'].artist, 'Artist B'))
   await check('a song nobody knows still comes back, untitled, with its window', () => {
     assert.equal(by['song-c'].title, null)
     assert.deepEqual([by['song-c'].start, by['song-c'].duration], [1200, 120])
   })
   await check('Podcast Index is asked only about the misses', () =>
-    assert.ok(!piAsked.some((u) => u.includes('guid=song-a')) && piAsked.length === 2))
+    assert.ok(!piAsked.some((u) => u.includes('guid=song-a') || u.includes('guid=album-a')) &&
+      piAsked.filter((u) => u.includes('/episodes/')).length === 2 &&
+      piAsked.filter((u) => u.includes('/podcasts/')).length === 2))
   await check('caches an hour when the feed answered', () => assert.match(res.headers.get('Cache-Control'), /max-age=3600/))
   await check('an unreadable feed answers 200 with nothing, cached briefly', async () => {
     const r = await call('guid=ep-7&feedUrl=' + encodeURIComponent('https://gone.example/feed.xml'))
