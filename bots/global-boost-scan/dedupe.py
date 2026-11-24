@@ -62,6 +62,16 @@ Measured over 90 days before the change: 145 standing copies, 121,444 sats,
   apart: 62 within 30s, 54 of them chadf-boostbot's per-leg notes), which
   Reed's 2026-08-30 call below keeps. `test_dedupe_clusters.py`.
 
+A PARTNER MAY SIT ON ITS HOST CREDIT (2026-11-24, with boost_credits). A
+boost made during a value-time split is recorded by the donor's app on the
+song and by a node-watching bot on the host episode, so the hard key's
+episode and show are also read off the partner's `role='host'` credit row
+(`_host_credit_candidates`), in tier 0 and in the ordinary tiers alike. Sats
+and evidence are the payment's, never the credit's share. Full-history dry
+run on the day: 13 relay notes, 6,185 sats, all one payment on inspection
+(8 chadf-boostbot beside BoostMeBitch, 2 beside MSP 2.0, 3 libre-relay-bot
+beside Boostr_Bot). `test_dedupe_credits.py`.
+
 ONE-TO-ONE HAS ONE EXCEPTION, AND IT IS ON THE RELAY SIDE (2026-08-30).
 chadf-boostbot signs one kind-9735 receipt and one note PER KEYSEND LEG, so a
 multi-leg boost is two or three bot notes, identical except for the quoted
@@ -440,8 +450,9 @@ def _sender_pubkey(row):
 def _sender_match(conn, b, sender, claimed):
     """Tier 0 (see the module docstring): the non-relay note SIGNED BY the
     donor the relay note names, on the same episode and show, within
-    ±APP_WINDOW, nearest first. Sats deliberately not in the key. Returns
-    (partner, "sender", gap) or None."""
+    ±APP_WINDOW, nearest first; "the same episode" may be the partner's host
+    credit (`_host_credit_candidates`). Sats deliberately not in the key.
+    Returns (partner, "sender", gap) or None."""
     ph = ",".join("?" * len(RELAY_PUBLISHERS))
     egb = db.effective_guid("b")
     cands = conn.execute(
@@ -453,6 +464,12 @@ def _sender_match(conn, b, sender, claimed):
         [sender, b["created_at"] - APP_WINDOW, b["created_at"] + APP_WINDOW,
          b["item_guid"] or "", b["canonical_guid"] or b["podcast_guid"] or ""]
         + list(RELAY_PUBLISHERS) + [b["event_id"]]).fetchall()
+    seen = {o["event_id"] for o in cands}
+    cands = list(cands) + [
+        o for o, loc in _host_credit_candidates(conn, b, APP_WINDOW)
+        if o["event_id"] not in seen and o["booster_pubkey"] == sender
+        and o["client_id"] not in RELAY_PUBLISHERS
+        and (loc["item_guid"] or "") == (b["item_guid"] or "")]
     best = None
     for o in cands:
         if o["event_id"] in claimed:
@@ -573,6 +590,31 @@ def _evidence(conn, b, o):
     return "msg+app" if (b_prose or (o_relay and o_prose)) else "app"
 
 
+def _host_credit_candidates(conn, b, window):
+    """Notes whose boost_credits HOST row sits where relay note `b` sits.
+
+    A boost made during a value-time split is one payment the donor's app
+    records on the SONG (the boosts row) and a node-watching bot records on
+    the HOST episode, because the bot sees the host's node receive it. The
+    hard key above compares boosts rows, so the two never met; with the
+    credits both notes land on the episode page and the payment reads twice
+    (2026-11-24, Social Hour ep 001, two BoostMeBitch + chadf-boostbot pairs).
+    So the partner's location may also be its host credit: same show guid,
+    the episode compared as `_episode_compatible` does. Sats and evidence are
+    the payment's, unchanged: the credit's share is never the amount. Returns
+    [(row, location)], location a dict with the host's item_guid."""
+    rows = conn.execute(
+        """SELECT b.*, c.item_guid AS host_item FROM boost_credits c
+           JOIN boosts b ON b.event_id = c.event_id
+           WHERE c.role = 'host' AND c.podcast_guid = ?
+             AND b.created_at BETWEEN ? AND ?
+             AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?
+             AND b.sats IS NOT NULL""",
+        [b["canonical_guid"] or b["podcast_guid"] or "",
+         b["created_at"] - window, b["created_at"] + window, b["event_id"]]).fetchall()
+    return [(o, {"item_guid": o["host_item"]}) for o in rows]
+
+
 def _keeper(members):
     """Which note of a cluster is the record. The donor's own note always;
     among bot notes alone, the one carrying the most of the payment (an
@@ -641,8 +683,12 @@ def find_duplicates(conn, since=None):
                   AND b.sats IS NOT NULL""",
             [b["created_at"] - MSG_WINDOW, b["created_at"] + MSG_WINDOW,
              b["canonical_guid"] or b["podcast_guid"] or "", b["event_id"]]).fetchall()
-        for o in cands:
-            if o["event_id"] in absorbed or not _episode_compatible(b, o) or not _sats_close(b, o):
+        cands = [(o, o) for o in cands]
+        seen = {o["event_id"] for o, _ in cands}
+        cands += [(o, loc) for o, loc in _host_credit_candidates(conn, b, MSG_WINDOW)
+                  if o["event_id"] not in seen]
+        for o, loc in cands:
+            if o["event_id"] in absorbed or not _episode_compatible(b, loc) or not _sats_close(b, o):
                 continue
             o_relay = o["client_id"] in RELAY_PUBLISHERS
             if o_relay:

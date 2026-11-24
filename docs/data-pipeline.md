@@ -736,6 +736,11 @@ episode, the sats divided by the window's `remotePercentage`. Reed's design,
   rewrites both rows. A boost that becomes excluded or a duplicate loses its
   credits, in D1 through the reproject queue's `credit` kind. The D1 table
   creates itself on its first push, in a batch of its own after the boost delta.
+- **The duplicate filter reads the host credit too.** A node-watching bot
+  records the payment on the host episode while the donor's app records it on
+  the song, so `dedupe.py` also looks for a relay note's partner through the
+  partner's host credit; the donor's note stays the keeper. 13 relay notes,
+  6,185 sats, over full history on 2026-11-24.
 
 ## Not indexed: `podcast:person`
 
