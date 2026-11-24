@@ -157,13 +157,9 @@ html.obp-docked body { padding-bottom: 5.5rem; }
 /* A song row in the chapters drawer: the seek button and, beside it, the
    song's heart. */
 .ep-song { display: flex; align-items: center; }
-.ep-song .ep-chapter-btn { flex: 1; min-width: 0; flex-wrap: wrap; }
+.ep-song .ep-chapter-btn { flex: 1; min-width: 0; }
 .ep-song > [data-fav] { flex: none; margin-right: 0.75rem; }
-.ep-chapter-sub {
-  flex-basis: 100%;
-  margin-left: 3.95rem;
-  font-size: 0.8rem; color: var(--muted);
-}
+.ep-chapter-sub { color: var(--muted); }
 
 /* ── The player card, and the two drawers inside it ───────────────────── */
 

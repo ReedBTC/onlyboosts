@@ -22,22 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v297'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v297'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v297'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v297'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v297'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v299'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v299'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v299'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v299'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v299'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v297'
+} from '/assets/js/detail-page.js?v=ob-v299'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v297'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v297'
-import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v297'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v297'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v299'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v299'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v299'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v299'
 
 const VALUE_API = '/api/value'
 
@@ -279,7 +279,7 @@ function paintNotes(notes) {
  * in ONE list, by start time, as two kinds of row:
  *
  *   a chapter   its time and title; a click seeks there
- *   a song      ♪, its title, its album or artist, and its heart, from the
+ *   a song      ♪, its title and artist on one line, and its heart, from the
  *               episode's <podcast:valueTimeSplit> windows (/api/episode-songs)
  *
  * ⚠️ A HEART RIDES A SONG ROW, NEVER A CHAPTER. A chapter is not mapped to a
@@ -319,13 +319,14 @@ function rowButton(secs, titleText, subText) {
   // textContent throughout: every title here is a publisher's string from a
   // third-party file, so none of it touches innerHTML.
   title.textContent = titleText
-  btn.append(time, title)
+  // A song's artist rides the same line as its title: "♪ Song - Artist".
   if (subText) {
     const sub = document.createElement('span')
     sub.className = 'ep-chapter-sub'
-    sub.textContent = subText
-    btn.appendChild(sub)
+    sub.textContent = ' - ' + subText
+    title.appendChild(sub)
   }
+  btn.append(time, title)
   btn.addEventListener('click', () => player?.seek(secs))
   return btn
 }
