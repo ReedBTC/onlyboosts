@@ -58,8 +58,8 @@
    chapter or a song begins. */
 .obp {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: 0.35rem;
   padding: 0.6rem 0.75rem;
   background: var(--white);
   border: 1px solid var(--border);
@@ -82,12 +82,23 @@
   background: var(--brand-dd); border-color: var(--brand-dd); color: #fff;
   font-size: 0.95rem; line-height: 1;
 }
-.obp .obp-skip, .obp .obp-rate {
+.obp .obp-skip, .obp .obp-rate, .obp .obp-chap {
   min-width: 2.6rem; height: 2rem; padding: 0 0.5rem;
   font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums;
 }
-.obp button:hover { border-color: var(--brand); }
-.obp-main { flex: 1; min-width: 0; }
+.obp .obp-chap { display: inline-flex; align-items: center; justify-content: center; }
+.obp .obp-chap[hidden] { display: none; }
+.obp button:disabled { opacity: 0.4; cursor: default; }
+.obp button:hover:not(:disabled) { border-color: var(--brand); }
+.obp-main { min-width: 0; }
+/* The buttons under the line: play and its four skips centred, the speed at
+   the right edge. The empty first column balances the speed so the centre is
+   the bar's centre. */
+.obp-controls {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+}
+.obp-transport { grid-column: 2; display: flex; align-items: center; gap: 0.5rem; }
+.obp-controls .obp-rate { grid-column: 3; justify-self: end; }
 .obp-now {
   display: flex; align-items: center; gap: 0.4rem;
   font-size: 0.82rem; font-weight: 600; color: var(--ink);
@@ -146,12 +157,17 @@
 }
 /* Room at the foot of the page, so the docked bar never sits over its last
    line. */
-html.obp-docked body { padding-bottom: 5.5rem; }
+html.obp-docked body { padding-bottom: 8.5rem; }
 
 @media (max-width: 520px) {
-  .obp { gap: 0.4rem; padding: 0.5rem; }
-  .obp .obp-skip { min-width: 2.2rem; padding: 0 0.3rem; }
-  .obp .obp-rate { display: none; }
+  .obp { padding: 0.5rem 0.6rem; }
+  .obp-transport { gap: 0.35rem; }
+  .obp .obp-skip, .obp .obp-chap { min-width: 2.3rem; padding: 0 0.3rem; }
+}
+/* The narrowest phones cannot balance the speed with an empty column; the
+   row spreads instead. */
+@media (max-width: 370px) {
+  .obp-controls { display: flex; justify-content: space-between; }
 }
 
 /* A song row in the chapters drawer: the seek button and, beside it, the

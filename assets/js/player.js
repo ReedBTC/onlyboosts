@@ -80,6 +80,35 @@ export function chaptersBesideSongs(chapters, songs) {
   })
 }
 
+/* Where a chapter or a song begins: the ticks on the line and the stops for
+ * the previous and next buttons, one list for both. */
+export function markStarts(chapters, songs) {
+  const out = [
+    ...chaptersBesideSongs(chapters, songs).map((c) => Number(c.start) || 0),
+    ...(songs || []).map((s) => Number(s.start) || 0),
+  ].filter((t) => t > 0)
+  return [...new Set(out)].sort((a, b) => a - b)
+}
+
+/* Previous goes to the start of what is playing, or, within the first few
+ * seconds of it, to the one before: the convention of every player with a
+ * previous-track button. The episode's own start is always a stop. */
+export const PREV_GRACE_SECS = 3
+export function prevStart(starts, t) {
+  let hit = 0
+  for (const s of starts || []) {
+    if (s <= t - PREV_GRACE_SECS) hit = s
+    else break
+  }
+  return hit
+}
+
+/* Next is the first start ahead of the playhead, or null past the last. */
+export function nextStart(starts, t) {
+  for (const s of starts || []) if (s > t + 0.5) return s
+  return null
+}
+
 function el(tag, cls, text) {
   const n = document.createElement(tag)
   if (cls) n.className = cls
@@ -116,6 +145,17 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
 
   const play = el('button', 'obp-play')
   play.type = 'button'
+  // Constant markup, no outside text: the two chapter-skip glyphs are drawn
+  // rather than typed, since the ⏮ ⏭ characters render as colour emoji on
+  // some phones.
+  const prev = el('button', 'obp-chap')
+  prev.type = 'button'
+  prev.setAttribute('aria-label', 'Previous chapter')
+  prev.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2" y="3" width="2" height="10" fill="currentColor"/><path d="M14 3v10L5 8z" fill="currentColor"/></svg>'
+  const next = el('button', 'obp-chap')
+  next.type = 'button'
+  next.setAttribute('aria-label', 'Next chapter')
+  next.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2 3v10l9-5z" fill="currentColor"/><rect x="12" y="3" width="2" height="10" fill="currentColor"/></svg>'
   const back = el('button', 'obp-skip', '−15')
   back.type = 'button'
   back.setAttribute('aria-label', 'Back 15 seconds')
@@ -150,7 +190,13 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   times.append(cur, dur)
   main.append(now, track, times)
 
-  bar.append(play, back, main, fwd, rate)
+  // The line on top, the buttons on a row of their own beneath it (Reed,
+  // 2026-11-24: beside the buttons the line was too short on a phone).
+  const controls = el('div', 'obp-controls')
+  const transport = el('div', 'obp-transport')
+  transport.append(prev, back, play, fwd, next)
+  controls.append(transport, rate)
+  bar.append(main, controls)
   slot.appendChild(bar)
   host.appendChild(slot)
 
@@ -206,11 +252,16 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
     const frac = L ? Math.min(1, t / L) : 0
     fill.style.width = (frac * 100).toFixed(3) + '%'
     if (!dragging) range.value = String(Math.round(frac * 1000))
+    next.disabled = nextStart(starts, t) == null
     paintNow(t)
   }
 
+  let starts = []
   function paintMarkers() {
     const L = length()
+    starts = markStarts(chapters, songs)
+    // No chapters and no songs: nothing to skip between, so no skip buttons.
+    prev.hidden = next.hidden = !starts.length
     ticks.replaceChildren()
     if (!L) return
     // One kind of mark for both: a tick where a chapter or a song begins.
@@ -235,6 +286,11 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
       const p = audio.play()
       if (p && typeof p.catch === 'function') p.catch(() => {})
     } else audio.pause()
+  })
+  prev.addEventListener('click', () => seek(prevStart(starts, audio.currentTime || 0), { start: !audio.paused }))
+  next.addEventListener('click', () => {
+    const t = nextStart(starts, audio.currentTime || 0)
+    if (t != null) seek(t, { start: !audio.paused })
   })
   back.addEventListener('click', () => seek(audio.currentTime - 15, { start: !audio.paused }))
   fwd.addEventListener('click', () => seek(audio.currentTime + 30, { start: !audio.paused }))

@@ -451,8 +451,15 @@ queued behind `loadedmetadata`.
 
 Built 2026-11-24 at Reed's request: the bar under the `/episode` hero is
 `assets/js/player.js`, which takes the controls off the page's own `<audio>`
-(the no-JavaScript reading) and drives it. Play, back 15, forward 30, speed,
-and a seek line carrying a tick wherever a chapter or a song begins.
+(the no-JavaScript reading) and drives it. The seek line on top, carrying a
+tick wherever a chapter or a song begins; under it, on a row of their own
+(Reed, 2026-11-24: beside the buttons the line was too short on a phone),
+previous chapter, back 15, play, forward 30, next chapter, and the speed.
+
+- **Previous and next stop where the ticks are** (`markStarts`): previous goes
+  to the start of what is playing, or to the one before within its first 3
+  seconds; the episode's start is always a stop. With no chapters and no songs
+  the two buttons are hidden.
 
 - **The songs are the episode's `<podcast:valueTimeSplit>` windows**, read from
   the show's RSS by `/api/episode-songs` (`functions/_shared/time-splits.js`) and
