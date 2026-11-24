@@ -34,13 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { rankLabel } from '/assets/js/rank.js?v=ob-v298'
+import { rankLabel } from '/assets/js/rank.js?v=ob-v300'
 import { renderEpisodeCards, sortEpisodeItems, windowEpisodeItems, buildEpisodes, COPY, episodeRanks }
-  from '/assets/js/episode-card.js?v=ob-v298'
+  from '/assets/js/episode-card.js?v=ob-v300'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v298'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v298'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v298'
+  from '/assets/js/episode-card-actions.js?v=ob-v300'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v300'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v300'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
