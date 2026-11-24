@@ -261,12 +261,42 @@ CREATE TABLE IF NOT EXISTS screen_allow (
     added     TEXT NOT NULL      -- YYYY-MM-DD
 );
 
+-- Value-time-split dual credit (split_credit.py). Two rows per placed boost, one
+-- per role; the boosts row itself is never changed. `pct` is the track's share as
+-- the host feed wrote it (0-100), NULL when it is unknown, in which case the track
+-- row carries every sat and the host row 0. The two `sats` always add up to the
+-- boost's. `method` says how the host was told apart from the track: 'rss' (the
+-- host's own valueTimeSplit), 'medium' or 'tag' (inferred; pct NULL).
+CREATE TABLE IF NOT EXISTS boost_credits (
+    event_id      TEXT NOT NULL,
+    role          TEXT NOT NULL CHECK (role IN ('track', 'host')),
+    podcast_guid  TEXT,
+    item_guid     TEXT NOT NULL,
+    sats          INTEGER NOT NULL,
+    pct           REAL,
+    method        TEXT NOT NULL,
+    checked_at    INTEGER NOT NULL,
+    d1_synced     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (event_id, role)
+);
+CREATE INDEX IF NOT EXISTS idx_credits_podcast ON boost_credits(podcast_guid);
+CREATE INDEX IF NOT EXISTS idx_credits_item    ON boost_credits(item_guid);
+CREATE INDEX IF NOT EXISTS idx_credits_unsynced ON boost_credits(d1_synced);
+
+-- When split_credit last looked at a two-item note, and what it decided. The
+-- retry clock for a note nothing placed and for a placement with no percentage.
+CREATE TABLE IF NOT EXISTS split_checks (
+    event_id    TEXT PRIMARY KEY,
+    checked_at  INTEGER NOT NULL,
+    outcome     TEXT
+);
+
 -- Rows D1 has to be told about out of band. The projection is upsert-only and
 -- driven by NEW boosts, so a row that must DISAPPEAR (excluded) or be RECOUNTED
 -- (its show/episode lost boosts to an exclusion) has no other way to reach it.
 -- Drained by d1_sync --remote-delta; see cmd_remote_delta.
 CREATE TABLE IF NOT EXISTS d1_reproject (
-    kind  TEXT NOT NULL,     -- 'boost' (delete) | 'podcast' | 'episode' | 'profile' (re-derive or delete)
+    kind  TEXT NOT NULL,     -- 'boost' (delete) | 'podcast' | 'episode' | 'profile' (re-derive or delete) | 'credit' (delete a boost's split credits)
     id    TEXT NOT NULL,
     PRIMARY KEY (kind, id)
 );
@@ -1003,12 +1033,19 @@ def _cutoff():
 # fetching Podcast Index and kind-0s for content we've undertaken not to show is
 # outbound traffic about exactly the show that asked us to stop.
 def guids_needing_show(conn):
+    """Shows to ask Podcast Index about. A split credit names feeds no boosts row
+    does (the song of a host-primary boost, the host of a song-primary one), and
+    a credit on a feed with no shows row renders untitled, so those count too."""
     eg = effective_guid("b")
     rows = conn.execute(
-        f"""SELECT DISTINCT {eg} AS g FROM boosts b
-           LEFT JOIN shows s ON s.podcast_guid = {eg}
-           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = {eg}
-           WHERE {eg} IS NOT NULL AND s.podcast_guid IS NULL AND {not_excluded('b')}
+        f"""SELECT g FROM (
+               SELECT {eg} AS g FROM boosts b WHERE {not_excluded('b')}
+               UNION
+               SELECT c.podcast_guid FROM boost_credits c
+               JOIN boosts b ON b.event_id = c.event_id WHERE {not_excluded('b')})
+           LEFT JOIN shows s ON s.podcast_guid = g
+           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = g
+           WHERE g IS NOT NULL AND s.podcast_guid IS NULL
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
@@ -1696,7 +1733,9 @@ def playlist_credit_candidates(conn):
 
     A named feed that is NOT a list is deliberately out of scope, even when the
     item turns out to live elsewhere: that is a moved or mirrored feed, or a
-    value-time split, and it belongs to the alias rungs, not this one."""
+    value-time split. A moved feed belongs to the alias rungs; a value-time split
+    is split_credit.py's, which credits song and host side by side in
+    `boost_credits` and leaves canonical_guid alone."""
     return conn.execute(
         f"""SELECT b.event_id, b.podcast_guid, b.item_guid, b.raw_json,
                    s.feed_url AS list_feed_url
@@ -1795,6 +1834,52 @@ def mark_orphaned_podcasts_deleted(conn, guids):
     conn.executemany(
         "UPDATE d1_podcasts_orphaned SET deleted_at=? WHERE podcast_guid=?",
         [(int(time.time()), g) for g in guids])
+    conn.commit()
+
+
+# ── value-time-split credits (split_credit.py) ────────────────────────────────
+def split_credit_candidates(conn, retry_before):
+    """Boosts whose note names two item guids that split_credit has not settled:
+    never looked at, or last looked at before `retry_before` and either unplaced
+    or placed with no percentage. A placed percentage is final. The LIKE is a
+    prefilter (70ms over the whole table, measured 2026-11-23); split_credit
+    counts distinct guids itself."""
+    return conn.execute(
+        f"""SELECT b.event_id, b.sats, b.raw_json, b.item_guid,
+                   {effective_guid('b')} AS credited_guid,
+                   c.pct AS had_pct, c.method AS had_method
+            FROM boosts b
+            LEFT JOIN boost_credits c ON c.event_id = b.event_id AND c.role = 'host'
+            LEFT JOIN split_checks k ON k.event_id = b.event_id
+            WHERE {not_excluded('b')}
+              AND b.raw_json LIKE '%podcast:item:guid:%podcast:item:guid:%'
+              AND (c.event_id IS NULL OR c.pct IS NULL)
+              AND (k.event_id IS NULL OR k.checked_at < ?)""", (retry_before,)).fetchall()
+
+
+def write_credits(conn, rows, checks):
+    """Replace both credit rows of each boost in `rows` (event_id, role,
+    podcast_guid, item_guid, sats, pct, method, checked_at) and record `checks`
+    (event_id, checked_at, outcome). Every written row is un-synced, so the next
+    D1 delta pushes it."""
+    conn.executemany(
+        """INSERT OR REPLACE INTO boost_credits
+           (event_id, role, podcast_guid, item_guid, sats, pct, method, checked_at, d1_synced)
+           VALUES (?,?,?,?,?,?,?,?,0)""", rows)
+    conn.executemany(
+        """INSERT INTO split_checks (event_id, checked_at, outcome) VALUES (?,?,?)
+           ON CONFLICT(event_id) DO UPDATE SET checked_at=excluded.checked_at,
+                                               outcome=excluded.outcome""", checks)
+    conn.commit()
+
+
+def drop_credits(conn, event_ids):
+    """Remove the credits of boosts that became excluded or duplicates, here and,
+    through the reproject queue, in D1."""
+    conn.executemany("DELETE FROM boost_credits WHERE event_id=?", [(e,) for e in event_ids])
+    if _has_table(conn, "d1_reproject"):
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES ('credit', ?)",
+                         [(e,) for e in event_ids])
     conn.commit()
 
 

@@ -312,6 +312,8 @@ Reasoning in `docs/data-pipeline.md`.
   dropped row in `/api/v1/boosts` is a duplicate note there. Flag such a change.
 - **A song boosted off a playlist is credited to the song's feed**, per boost through
   `canonical_guid`, never an alias; the as-signed playlist guid stays on the row.
+- **A boost during a value-time split is credited to song and host in `boost_credits`**, two rows,
+  sats by share; the `boosts` row is untouched (`docs/data-pipeline.md`).
 - **The site's own boosts reach D1 at the edge** (`/api/v1/boosts/ingest`); the
   collector stays the source of truth.
 
