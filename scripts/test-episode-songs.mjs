@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { findItem, readTimeSplits } from '../functions/_shared/time-splits.js'
 import { onRequestGet, onRequestHead } from '../functions/api/episode-songs.js'
-import { songAt, chapterAt, fmtTime, chaptersBesideSongs } from '../assets/js/player.js'
+import { songAt, chapterAt, fmtTime, chaptersBesideSongs, markStarts, prevStart, nextStart } from '../assets/js/player.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failed = 0, passed = 0
@@ -151,6 +151,23 @@ console.log('\nThe player’s lookups:')
   })
   await check('a chapter further than the tolerance from every song stays', () =>
     assert.equal(chaptersBesideSongs([{ start: 300, title: 'Talk' }], [{ start: 303, duration: 10 }]).length, 1))
+  {
+    const starts = markStarts(
+      [{ start: 0, title: 'Welcome' }, { start: 340, title: 'Same as the song' }, { start: 774, title: 'Charts' }],
+      [{ start: 341.5, duration: 200 }, { start: 600, duration: 100 }])
+    await check('the skip stops are the ticks: kept chapters and songs, once each, past zero', () =>
+      assert.deepEqual(starts, [341.5, 600, 774]))
+    await check('⚠️ previous goes to the start of what is playing, and to the one before inside its first seconds', () => {
+      assert.equal(prevStart(starts, 650), 600)
+      assert.equal(prevStart(starts, 601), 341.5)
+      assert.equal(prevStart(starts, 100), 0)
+    })
+    await check('next goes to the first start ahead, and to nothing past the last', () => {
+      assert.equal(nextStart(starts, 341.5), 600)
+      assert.equal(nextStart(starts, 0), 341.5)
+      assert.equal(nextStart(starts, 800), null)
+    })
+  }
   await check('times read m:ss under an hour and h:mm:ss past it', () => {
     assert.equal(fmtTime(75), '1:15')
     assert.equal(fmtTime(3725), '1:02:05')

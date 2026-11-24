@@ -29,15 +29,15 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, chartSongTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v302'
-import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v302'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v302'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v302'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v302'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v302'
-import { npubEncode } from '/assets/js/mention-search.js?v=ob-v302'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v302'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v302'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, chartSongTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v304'
+import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v304'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v304'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v304'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v304'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v304'
+import { npubEncode } from '/assets/js/mention-search.js?v=ob-v304'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v304'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v304'
 
 const TILES = 10
 
@@ -196,11 +196,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v302')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v304')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v302')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v304')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -678,7 +678,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v302') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v304') } catch {}
   return window.OBFavorites || null
 }
 
