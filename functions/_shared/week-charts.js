@@ -34,6 +34,7 @@
 import { WEEK, MONDAY_EPOCH, PST, pacificOffset } from "../../assets/js/pacific-week.js";
 import { pacificOffsetSql } from "../api/v1/members/hours.js";
 import { PUBLISHERS } from "../api/v1/_common.js";
+import { CREDITED } from "./credited.js";
 
 export const KINDS = ["shows", "episodes", "artists", "albums", "songs"];
 
@@ -69,7 +70,7 @@ const LEVELS = {
     key: "b.podcast_guid",
     select: `pc.title AS title, pc.image AS image, pc.artwork AS artwork, pc.author AS author,
              NULL AS p_title`,
-    from: `FROM boosts b
+    from: `FROM ${CREDITED} b
            LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid`,
     where: [`b.podcast_guid IS NOT NULL`, TITLED, MUSIC(music)],
     meta: {
@@ -88,7 +89,7 @@ const LEVELS = {
              NULL AS author, pc.title AS p_title, pc.author AS p_author,
              pc.publisher_guid AS p_publisher, b.podcast_guid AS feed_guid, pc.feed_url AS feed_url,
              e.enclosure_url AS enclosure_url, e.duration AS duration`,
-    from: `FROM boosts b
+    from: `FROM ${CREDITED} b
            LEFT JOIN episodes e  ON e.item_guid     = b.item_guid
            LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid`,
     where: [`b.item_guid IS NOT NULL`, MUSIC(music)],
@@ -107,7 +108,7 @@ const LEVELS = {
              NULL AS author, NULL AS p_title`,
     from: `FROM publishers pub
            JOIN podcasts pc ON pc.publisher_guid = pub.publisher_guid
-           JOIN boosts b    ON b.podcast_guid    = pc.podcast_guid`,
+           JOIN ${CREDITED} b ON b.podcast_guid  = pc.podcast_guid`,
     where: [`pub.title IS NOT NULL`, MUSIC(true)],
     meta: {
       select: `pub.title AS title, pub.image AS image, pub.artwork AS artwork,
@@ -156,7 +157,7 @@ export async function weeklyChart(env, kind, ws, we, limit = 10) {
     WITH base AS (
       SELECT ${L.key} AS guid,
              ${L.select},
-             COUNT(*)                         AS boost_count,
+             COUNT(DISTINCT b.event_id)       AS boost_count,
              COALESCE(SUM(b.sats),0)          AS total_sats,
              COUNT(DISTINCT b.booster_pubkey) AS booster_count
       ${L.from}
@@ -205,8 +206,8 @@ export async function attachTopEpisodes(env, rows, ws, we) {
       SELECT b.podcast_guid AS show, b.item_guid AS item,
              ROW_NUMBER() OVER (PARTITION BY b.podcast_guid
                                 ORDER BY COUNT(DISTINCT b.booster_pubkey) DESC,
-                                         COALESCE(SUM(b.sats),0) DESC, COUNT(*) DESC, b.item_guid) AS rn
-      FROM boosts b
+                                         COALESCE(SUM(b.sats),0) DESC, COUNT(DISTINCT b.event_id) DESC, b.item_guid) AS rn
+      FROM ${CREDITED} b
       WHERE b.podcast_guid IN (${guids.map(() => "?").join(",")})
         AND b.item_guid IS NOT NULL
         AND b.created_at >= ? AND b.created_at < ?
@@ -239,8 +240,8 @@ export async function attachTopSongs(env, rows, ws, we) {
       SELECT pc.publisher_guid AS pub, b.item_guid AS item,
              ROW_NUMBER() OVER (PARTITION BY pc.publisher_guid
                                 ORDER BY COUNT(DISTINCT b.booster_pubkey) DESC,
-                                         COALESCE(SUM(b.sats),0) DESC, COUNT(*) DESC, b.item_guid) AS rn
-      FROM boosts b
+                                         COALESCE(SUM(b.sats),0) DESC, COUNT(DISTINCT b.event_id) DESC, b.item_guid) AS rn
+      FROM ${CREDITED} b
       JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
       WHERE pc.publisher_guid IN (${guids.map(() => "?").join(",")})
         AND ${MUSIC(true)}
@@ -274,7 +275,7 @@ export async function weeksAtNumberOne(env, kind, before, limit = 10) {
     WITH base AS (
       SELECT ${L.key} AS guid,
              ${wk} AS wk,
-             COUNT(*)                         AS boost_count,
+             COUNT(DISTINCT b.event_id)       AS boost_count,
              COALESCE(SUM(b.sats),0)          AS total_sats,
              COUNT(DISTINCT b.booster_pubkey) AS booster_count
       ${L.from}

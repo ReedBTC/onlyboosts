@@ -21,7 +21,8 @@
 // /api/v1/podcasts/<guid>?since: the card above the drawer shows the range's
 // numbers, and a drawer of all-time ones would contradict the card it opened
 // from.
-import { json, preflight, BOOST_SELECT, boostRecord } from "../_common.js";
+import { json, preflight, CREDITED_BOOST_SELECT, boostRecord } from "../_common.js";
+import { CREDITED } from "../../../_shared/credited.js";
 // Dependency-free on both sides, which is what keeps this module importable by
 // node for scripts/test-publishers-api.mjs — _shared/detail-page.js re-exports
 // through modules whose stamped sibling imports node cannot resolve, so the
@@ -52,12 +53,11 @@ export async function onRequestGet({ request, env, params }) {
   const { results } = windowed
     ? await env.DB.prepare(
         `SELECT b.podcast_guid AS guid, pc.title, pc.image, pc.artwork, pc.medium,
-                COUNT(*)                AS boost_count,
+                COUNT(DISTINCT b.event_id) AS boost_count,
                 COALESCE(SUM(b.sats),0) AS total_sats
-         FROM boosts b
+         FROM ${CREDITED} b
          JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
-         WHERE pc.publisher_guid = ? AND b.created_at >= ?
-           AND COALESCE(pc.medium,'podcast') = 'music'
+         WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music') AND b.created_at >= ?
          GROUP BY b.podcast_guid
          ORDER BY total_sats DESC LIMIT 200`
       ).bind(guid, since).all()
@@ -126,10 +126,8 @@ async function lookupNames(env, messages) {
 
 export async function fetchPublisherCorpus(env, guid) {
   const { results } = await env.DB.prepare(
-    `${BOOST_SELECT}
-     JOIN podcasts pub_pc ON pub_pc.podcast_guid = b.podcast_guid
-     WHERE pub_pc.publisher_guid = ?
-       AND COALESCE(pub_pc.medium,'podcast') = 'music'
+    `${CREDITED_BOOST_SELECT}
+     WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music')
      ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
   ).bind(guid, CORPUS_CAP + 1).all();
 

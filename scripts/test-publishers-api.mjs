@@ -17,6 +17,7 @@
  *
  * Run: node scripts/test-publishers-api.mjs
  */
+import { CREDITED } from '../functions/_shared/credited.js'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
@@ -330,7 +331,8 @@ console.log('\nThe /artist page’s own SQL, extracted from the shipped Function
     assert.ok(i >= 0, `artist page no longer contains: ${start.slice(0, 40)}`)
     const j = src.indexOf('`', i)
     assert.ok(j > i, 'unterminated SQL template')
-    return src.slice(i, j)
+    // The credited-rows subquery is a shared constant; the page interpolates it.
+    return src.slice(i, j).replace(/\$\{CREDITED\}/g, CREDITED)
   }
 
   const communitySql = grabSql('WITH community AS (')
@@ -348,7 +350,7 @@ console.log('\nThe /artist page’s own SQL, extracted from the shipped Function
     assert.ok(!rows.some((r) => r.publisher_guid === G.haleen))
   })
 
-  const totalsSql = grabSql('SELECT COUNT(*) AS boosts, COALESCE(SUM(b.sats), 0) AS sats,')
+  const totalsSql = grabSql('SELECT COUNT(DISTINCT b.event_id) AS boosts, COALESCE(SUM(b.sats), 0) AS sats,')
   const t = db.prepare(totalsSql).get(G.haleen)
   check('the stat tiles aggregate the declaring shows', () =>
     assert.deepEqual([t.boosts, t.sats, t.boosters], [4, 1300, 3]))
@@ -432,7 +434,7 @@ console.log('\n⚠️ The artist tier counts MUSIC ONLY (Reed, 2026-08-31):')
   check('⚠️ the page’s #shows section is gone and its queries filter to music', () => {
     assert.ok(!src.includes('Shows with Nostr Boosts'),
       'the launch-day #shows section is back — the tier is music-only')
-    assert.ok((src.match(/COALESCE\((?:pc?|p|pub_pc)\.?medium,'podcast'\) = 'music'/g) || []).length >= 5,
+    assert.ok((src.match(/COALESCE\((?:(?:pc|p|pub_pc)\.)?medium,'podcast'\) = 'music'/g) || []).length >= 5,
       'every /artist query must carry the music filter')
   })
   const card = readFileSync(join(ROOT, 'assets/js/publisher-card.js'), 'utf8')

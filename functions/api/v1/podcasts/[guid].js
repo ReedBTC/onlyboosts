@@ -13,7 +13,8 @@
 //      with ?supporters=1 — the Shows feed doesn't need it and it's a GROUP BY.
 //   3. `?corpus=1` answers something else entirely: every boost sent to this
 //      show, in one bounded response, and none of the above. See fetchShowCorpus.
-import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { json, preflight, CREDITED_BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { CREDITED } from "../../../_shared/credited.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 import { headOf } from "../../../_shared/head.js";
@@ -71,9 +72,9 @@ export async function onRequestGet({ request, env, params }) {
     ? await env.DB.prepare(
         `SELECT b.item_guid, e.title, e.image, e.published, e.duration, e.episode_number,
                 e.enclosure_url,
-                COUNT(*)                AS boost_count,
+                COUNT(DISTINCT b.event_id) AS boost_count,
                 COALESCE(SUM(b.sats),0) AS total_sats
-         FROM boosts b
+         FROM ${CREDITED} b
          LEFT JOIN episodes e ON e.item_guid = b.item_guid
          WHERE b.podcast_guid = ? AND b.created_at >= ? AND b.item_guid IS NOT NULL
          GROUP BY b.item_guid
@@ -91,7 +92,7 @@ export async function onRequestGet({ request, env, params }) {
   const limit = clampLimit(u.searchParams.get("limit"), 50, 200);
   const recent = wantBoosts
     ? await env.DB.prepare(
-        `${BOOST_SELECT} WHERE b.podcast_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+        `${CREDITED_BOOST_SELECT} WHERE b.podcast_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
       ).bind(guid, limit).all()
     : { results: [] };
 
@@ -156,7 +157,7 @@ export async function onRequestGet({ request, env, params }) {
  */
 export async function fetchShowCorpus(env, guid) {
   const { results } = await env.DB.prepare(
-    `${BOOST_SELECT} WHERE b.podcast_guid = ?
+    `${CREDITED_BOOST_SELECT} WHERE b.podcast_guid = ?
      ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
   ).bind(guid, CORPUS_CAP + 1).all();
 
@@ -181,10 +182,10 @@ async function fetchSupporters(env, guid) {
   const { results } = await env.DB.prepare(
     `SELECT b.booster_pubkey, b.booster_npub,
             SUM(COALESCE(b.sats, 0)) AS sats,
-            COUNT(*)                 AS boosts,
+            COUNT(DISTINCT b.event_id) AS boosts,
             MAX(b.created_at)        AS latest,
             pr.name, pr.display_name, pr.picture
-     FROM boosts b
+     FROM ${CREDITED} b
      LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
      WHERE b.podcast_guid = ?
      GROUP BY b.booster_pubkey

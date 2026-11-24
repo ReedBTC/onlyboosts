@@ -163,9 +163,9 @@ function chartPopulationQuery(kind, music, cutoff = null) {
     base = `
       SELECT pc.publisher_guid                AS id,
              COALESCE(SUM(b.sats), 0)         AS m_sats,
-             COUNT(*)                         AS m_boosts,
+             COUNT(DISTINCT b.event_id)       AS m_boosts,
              COUNT(DISTINCT b.booster_pubkey) AS m_breadth
-        FROM boosts b
+        FROM ${CREDITED} b
         JOIN podcasts pc    ON pc.podcast_guid    = b.podcast_guid
         JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pub.title IS NOT NULL
@@ -188,9 +188,9 @@ function chartPopulationQuery(kind, music, cutoff = null) {
       base = `
       SELECT b.${col}                          AS id,
              COALESCE(SUM(b.sats),0)           AS m_sats,
-             COUNT(*)                          AS m_boosts,
+             COUNT(DISTINCT b.event_id)        AS m_boosts,
              COUNT(DISTINCT b.booster_pubkey)  AS m_breadth
-        FROM boosts b INDEXED BY idx_boosts_created
+        FROM ${CREDITED_BY_TIME} b
         LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
        WHERE b.${col} IS NOT NULL
          AND b.created_at >= ?
@@ -511,6 +511,7 @@ export async function feedRanks(db, kind, row, cache = null) {
 // as the all-time tile the page built prints its own: compact sats ("163.5k"),
 // plain thousands for the counts. Both modules are two-sided and dependency-
 // light; the Functions already import them through _shared/detail-page.js.
+import { CREDITED, CREDITED_BY_TIME } from "./credited.js";
 import { compact } from "../../assets/js/supporter-wall.js";
 import { num } from "../../assets/js/boost-list.js";
 

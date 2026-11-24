@@ -421,6 +421,17 @@ a.event-title:hover { color: var(--orange); }
   font-size: 0.84rem;
   line-height: 1.4;
 }
+/* The line under a boost made during a song: where the other side of it went
+   (boost-list.js#splitLineHtml). Muted and small, below the meta row: it
+   qualifies the figure above it and is not a second headline. */
+.ob-boost-split {
+  margin: -0.25rem 0 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.ob-boost-split-link { color: var(--text); font-weight: 600; text-decoration: none; }
+.ob-boost-split-link:hover { color: var(--accent-d); text-decoration: underline; }
 .ob-boost-sats {
   font-weight: 700;
   color: var(--accent-d);

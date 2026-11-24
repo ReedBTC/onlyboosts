@@ -24,6 +24,7 @@
 // Both project the same column names, so everything downstream of `base` — the
 // ranking, the search join, the ordering, the record shape — is written once.
 import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
+import { CREDITED } from "../../_shared/credited.js";
 
 import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
@@ -35,7 +36,7 @@ export async function onRequestOptions({ request }) { return preflight(request);
 // three breaks the windowed ranges and q= while All keeps working, which is the
 // half nobody checks first.
 const SORTS = {
-  boosts:   { col: "p.boost_count",   agg: "COUNT(*)",                         alias: "boost_count" },
+  boosts:   { col: "p.boost_count",   agg: "COUNT(DISTINCT b.event_id)",       alias: "boost_count" },
   sats:     { col: "p.total_sats",    agg: "COALESCE(SUM(b.sats),0)",          alias: "total_sats" },
   boosters: { col: "p.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
   latest:   { col: "p.latest_ts",     agg: "MAX(b.created_at)",                alias: "latest_ts" },
@@ -249,12 +250,12 @@ export async function globalPodcasts(env, p) {
       SELECT b.podcast_guid                     AS guid,
              pc.title, pc.image, pc.artwork, pc.feed_url, pc.medium, pc.author,
              pc.language,
-             COUNT(*)                           AS boost_count,
+             COUNT(DISTINCT b.event_id)         AS boost_count,
              COALESCE(SUM(b.sats),0)            AS total_sats,
              COUNT(DISTINCT b.booster_pubkey)   AS booster_count,
              COUNT(DISTINCT b.item_guid)        AS episode_count,
              MAX(b.created_at)                  AS latest_ts
-      FROM boosts b
+      FROM ${CREDITED} b
       LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
       WHERE ${where.join(" AND ")}
       GROUP BY b.podcast_guid`;
@@ -276,12 +277,12 @@ export async function globalPodcasts(env, p) {
       SELECT b.podcast_guid                     AS guid,
              pc.title, pc.image, pc.artwork, pc.feed_url, pc.medium, pc.author,
              pc.language,
-             COUNT(*)                           AS boost_count,
+             COUNT(DISTINCT b.event_id)         AS boost_count,
              COALESCE(SUM(b.sats),0)            AS total_sats,
              COUNT(DISTINCT b.booster_pubkey)   AS booster_count,
              COUNT(DISTINCT b.item_guid)        AS episode_count,
              MAX(b.created_at)                  AS latest_ts
-      FROM boosts b
+      FROM ${CREDITED} b
       LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
       WHERE ${where.join(" AND ")}
       GROUP BY b.podcast_guid`;

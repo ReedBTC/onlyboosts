@@ -19,19 +19,19 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v293'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v293'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v294'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v294'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v293'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v293'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v293'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v293'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v293'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v293'
-import { recommendRailsHtml, latestRailHtml, carrotRailHtml } from '/assets/js/recommend-rails.js?v=ob-v293'
-import { latestTile } from '/assets/js/rail-tile.js?v=ob-v293'
+} from '/assets/js/detail-page.js?v=ob-v294'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v294'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v294'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v294'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v294'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v294'
+import { recommendRailsHtml, latestRailHtml, carrotRailHtml } from '/assets/js/recommend-rails.js?v=ob-v294'
+import { latestTile } from '/assets/js/rail-tile.js?v=ob-v294'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -557,7 +557,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest?.('[data-opml-import]')
   if (!b) return
   e.preventDefault()
-  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v293').catch(() => null)
+  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v294').catch(() => null)
   window.OBFavorites?.importOpml?.()
 })
 

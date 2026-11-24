@@ -731,6 +731,46 @@ episode, the sats divided by the window's `remotePercentage`. Reed's design,
   credits, in D1 through the reproject queue's `credit` kind. The D1 table
   creates itself on its first push, in a batch of its own after the boost delta.
 
+### Reading The Credits At The Edge
+
+`functions/_shared/credited.js` exports `CREDITED`, the collector's
+`db.credited_rows()` as a subquery: one row per counted side, every `boosts`
+column under its own name, with `podcast_guid`, `item_guid` and `sats` taken from
+the credit on a split boost. A query that counts BY SUBJECT reads
+`FROM ${CREDITED} b` where it used to read `FROM boosts b`, and its windowed
+figures then agree with the collector's precomputed all-time columns by
+construction. Measured on 2026-11-24 against a D1 copy of OB-back's Step B dry
+run: all 2,577 podcasts and 13,024 episodes, zero differences.
+
+- **What reads it**: the chart population for shows, episodes and artists
+  (`feed-rank.js`, windowed), `week-charts.js` (and through it `/charts/2026`'s
+  Top 33), the windowed and follows branches of `/api/v1/podcasts`, `episodes`
+  and `publishers`, the four detail pages' totals, walls and boost lists, the
+  edge ingest's recount, and the homepage's debut and comeback window.
+- **⚠️ WHAT DOES NOT: anything about a person.** A booster's totals, the member
+  wall, the hours boards, `/stats`, `/api/v1/clients`, the Boosts feed and
+  `/booster` count each boost once, at what was sent. The year page's
+  month-by-month and app graphs stay on `boosts` for the same reason.
+- **⚠️ `COUNT(DISTINCT b.event_id)`, never `COUNT(*)`**: both sides of one boost
+  can name the same feed.
+- **⚠️ FILTER THE SUBJECT IN A WHERE, NEVER IN A JOIN.** SQLite pushes an outer
+  `b.podcast_guid = ?`, `b.item_guid = ?` or `b.created_at >= ?` into both arms
+  of the UNION ALL, so each keeps its index (`EXPLAIN QUERY PLAN` checked). A
+  join condition is not pushed: the subquery is read whole, which is every boost
+  in D1 per page view. That is why the artist queries filter
+  `b.podcast_guid IN (SELECT … WHERE publisher_guid = ?)` rather than joining
+  `podcasts` on the publisher, and why two rollups stay on `boosts`: the
+  community rollups on `/show` and `/artist` (joined on the booster) and the
+  homepage comeback look-back (a correlated lookup). Those are discovery
+  hints, not totals.
+- **A boost row prints what the booster sent** (`boost_sats`), and the line under
+  it names the other side: "During <song> · 900 to the song · 100 to the show"
+  on the show's side, "Heard on <episode> (<show>) · …" on the song's.
+  `CREDIT_ROW_COLS` / `CREDIT_ROW_JOINS` select it, `creditRecord` publishes it
+  as the record's `credit` field, and `boost-list.js#splitLineHtml` renders it on
+  the detail pages and in the episode-card drawers. With `pct` NULL the line
+  names the other side and prints no division.
+
 ## Not indexed: `podcast:person`
 
 `<podcast:person>` is **not** in this pipeline and deliberately isn't being added.

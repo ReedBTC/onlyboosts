@@ -47,6 +47,7 @@ import {
   renderSupporters, renderBoosts, lookupMentionNames,
 } from "../_shared/detail-page.js";
 import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
+import { CREDITED, CREDIT_ROW_COLS, CREDIT_ROW_JOINS } from "../_shared/credited.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
@@ -114,13 +115,11 @@ export async function onRequestGet(context) {
     // columns, so the figures and the community rollup are computed over the
     // same rows in the same render.
     env.DB.prepare(
-      `SELECT COUNT(*) AS boosts, COALESCE(SUM(b.sats), 0) AS sats,
+      `SELECT COUNT(DISTINCT b.event_id) AS boosts, COALESCE(SUM(b.sats), 0) AS sats,
               COUNT(DISTINCT b.booster_pubkey) AS boosters,
               MAX(b.created_at) AS latest_ts
-       FROM boosts b
-       JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
-       WHERE pc.publisher_guid = ?
-         AND COALESCE(pc.medium,'podcast') = 'music'`
+       FROM ${CREDITED} b
+       WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music')`
     ).bind(guid).first(),
 
     // What else this artist's community boosts — the show page's community
@@ -142,10 +141,8 @@ export async function onRequestGet(context) {
     env.DB.prepare(
       `WITH community AS (
          SELECT DISTINCT b.booster_pubkey
-         FROM boosts b
-         JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
-         WHERE pc.publisher_guid = ?
-           AND COALESCE(pc.medium,'podcast') = 'music'
+         FROM ${CREDITED} b
+         WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music')
        )
        SELECT pc.publisher_guid, pub.title, pub.image, pub.artwork,
               COUNT(*)                         AS cs_boosts,
@@ -172,14 +169,12 @@ export async function onRequestGet(context) {
     env.DB.prepare(
       `SELECT b.booster_pubkey, b.booster_npub,
               SUM(COALESCE(b.sats, 0)) AS sats,
-              COUNT(*)                 AS boosts,
+              COUNT(DISTINCT b.event_id) AS boosts,
               MAX(b.created_at)        AS latest,
               pr.name, pr.display_name, pr.picture
-       FROM boosts b
-       JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+       FROM ${CREDITED} b
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
-       WHERE pc.publisher_guid = ?
-         AND COALESCE(pc.medium,'podcast') = 'music'
+       WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music')
        GROUP BY b.booster_pubkey
        ORDER BY sats DESC, boosts DESC, b.booster_pubkey
        LIMIT ?`
@@ -189,17 +184,17 @@ export async function onRequestGet(context) {
     // (p_title) because each row's album is new information here, the same
     // reasoning as /booster's list; the whole corpus is behind ?corpus=1.
     env.DB.prepare(
-      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
+              ${CREDIT_ROW_COLS},
               b.item_guid, b.podcast_guid, b.message, b.client_id,
               e.title AS e_title, e.episode_number AS e_num,
               p.title AS p_title,
               pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
-       FROM boosts b
+       FROM ${CREDITED} b
        JOIN podcasts p ON p.podcast_guid = b.podcast_guid
        LEFT JOIN episodes e ON e.item_guid = b.item_guid
-       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
-       WHERE p.publisher_guid = ?
-         AND COALESCE(p.medium,'podcast') = 'music'
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey${CREDIT_ROW_JOINS}
+       WHERE b.podcast_guid IN (SELECT podcast_guid FROM podcasts WHERE publisher_guid = ? AND COALESCE(medium,'podcast') = 'music')
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(guid, BOOSTS_SHOWN).all(),
   ]);
@@ -354,16 +349,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v294" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v294" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -771,12 +766,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v293" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v293" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v294" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v294" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v293"></script>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v294"></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
 }
@@ -966,10 +961,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
 </head>
 <body>
 <section class="page-header">
@@ -987,7 +982,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
   return new Response(html, {

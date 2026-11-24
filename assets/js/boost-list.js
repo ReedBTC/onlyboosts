@@ -30,17 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v293';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v293';
+} from './nostr-text.js?v=ob-v294';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v294';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v293';
-import { httpsUrl } from './cover-art.js?v=ob-v293';
-import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v293';
+import { boosterPageHref } from './booster-link.js?v=ob-v294';
+import { httpsUrl } from './cover-art.js?v=ob-v294';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v294';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -153,6 +153,14 @@ export function rowsFromRecords(records) {
     pr_dname: b.booster?.dname ?? null,
     pr_name: b.booster?.name ?? null,
     pr_pic: b.booster?.pic ?? null,
+    // The split of a boost made during a song (creditRecord in _common.js),
+    // flattened to the columns the page queries select; see splitLineHtml.
+    ...(b.credit ? {
+      credit_role: b.credit.role ?? null, credit_pct: b.credit.pct ?? null,
+      credit_sats: b.credit.sats ?? null, other_sats: b.credit.other?.sats ?? null,
+      other_item: b.credit.other?.item ?? null, other_guid: b.credit.other?.guid ?? null,
+      other_title: b.credit.other?.title ?? null, other_show: b.credit.other?.show ?? null,
+    } : {}),
   }));
 }
 
@@ -384,6 +392,59 @@ function stateScript(state) {
     JSON.stringify(state).replace(/</g, "\\u003c")}</script>`;
 }
 
+/**
+ * The line under a boost made while a song played inside a show: where the
+ * other half of it went. A boost like that is listed on the song AND on the
+ * host episode (functions/_shared/credited.js), and each listing names the
+ * other side, so a reader on either page can tell this boost from an ordinary
+ * one and see why the totals count less than the row shows:
+ *
+ *   on the show's side  "During <song> · 990 to the song · 10 to the show"
+ *   on the song's side  "Heard on <episode> · 990 to the song · 10 to the show"
+ *
+ * The row's own figure stays what the booster sent. The split is the feed's
+ * remotePercentage as the collector read it; when nobody knows it (a song
+ * played on a live show, an episode that has left its feed) the line names
+ * the other side and prints no division, since the whole boost is counted on
+ * the song and there is nothing honest to put after it.
+ *
+ * Returns "" for every other boost.
+ */
+export function splitLineHtml(r) {
+  // A published record carries the split as `credit` (creditRecord in
+  // _common.js); the episode cards keep records that way. Flatten it here so
+  // one function reads both shapes, exactly as rowsFromRecords would.
+  if (r && r.credit && !r.credit_role) r = rowsFromRecords([{ credit: r.credit }])[0];
+  if (!r || (r.credit_role !== "track" && r.credit_role !== "host")) return "";
+  const onSong = r.credit_role === "track";
+  const title = r.other_title ? truncate(r.other_title, 70) : null;
+  const epHref = title ? episodePageHref(r.other_item, r.other_title) : null;
+  const showHref = r.other_show ? showPageHref(r.other_guid) : null;
+  let other = null;
+  if (title) {
+    other = epHref
+      ? `<a class="ob-boost-split-link" href="${htmlEscape(epHref)}">${htmlEscape(title)}</a>`
+      : htmlEscape(title);
+  } else if (r.other_show) {
+    const t = htmlEscape(truncate(r.other_show, 60));
+    other = showHref ? `<a class="ob-boost-split-link" href="${htmlEscape(showHref)}">${t}</a>` : t;
+  }
+  // On the song's side the episode title alone is often just a number, so the
+  // show rides beside it when the title is what was linked.
+  const showAfter = onSong && title && r.other_show
+    ? ` (${htmlEscape(truncate(r.other_show, 60))})` : "";
+  const lead = onSong
+    ? (other ? `Heard on ${other}${showAfter}` : "Heard on a show")
+    : (other ? `During ${other}` : "During a song");
+  const songSats = Number(onSong ? r.credit_sats : r.other_sats);
+  const showSats = Number(onSong ? r.other_sats : r.credit_sats);
+  const known = r.credit_pct != null && Number.isFinite(songSats) && Number.isFinite(showSats);
+  const split = known
+    ? ` · ${htmlEscape(num(songSats))} to the song · ${htmlEscape(num(showSats))} to the show`
+    : "";
+  return `<div class="ob-boost-split">${lead}${split}</div>`;
+}
+
 function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = false }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
@@ -524,6 +585,7 @@ function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = f
           ${meta ? `<div class="ob-boost-meta">
             ${meta}
           </div>` : ""}
+          ${splitLineHtml(r)}
           ${bodyHtml ? `<div class="note-body">${bodyHtml}</div>` : ""}
         </article>
       </li>`;

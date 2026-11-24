@@ -519,6 +519,14 @@ a.pcast-show-link:hover { text-decoration: underline; }
   white-space: pre-wrap; word-break: break-word;
 }
 .pcast-boost-msg a { color: var(--accent-d); }
+/* A boost made during a song: where its other side went (boost-list.js#
+   splitLineHtml). Styled here as well as in boosts-thread.css because the
+   feed pages do not all load that file. */
+.pcast-boost .ob-boost-split {
+  margin-top: 0.3rem; font-size: 0.78rem; line-height: 1.35; color: var(--muted);
+}
+.pcast-boost .ob-boost-split-link { color: var(--text); font-weight: 600; text-decoration: none; }
+.pcast-boost .ob-boost-split-link:hover { color: var(--accent-d); text-decoration: underline; }
 /* Shared reply/repost/like/zap bar (boost-actions.css) under each comment —
    scoped-down here: no divider line, smaller + tighter than the boosts page. */
 .pcast-boost .note-actions {
