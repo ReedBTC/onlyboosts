@@ -22,20 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v294'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v294'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v294'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v294'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v294'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v296'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v296'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v296'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v296'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v296'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v294'
+} from '/assets/js/detail-page.js?v=ob-v296'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v294'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v294'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v296'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v296'
+import { mountPlayer } from '/assets/js/player.js?v=ob-v296'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v296'
 
 const VALUE_API = '/api/value'
 
@@ -231,21 +233,6 @@ function fmtChapterTime(totalSecs) {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
 }
 
-/* Seek the player to a chapter and start it.
- *
- * The element is preload="none", so on a first click there is no duration yet
- * and assigning currentTime is silently dropped. play() is what triggers the
- * load, so the assignment is queued behind loadedmetadata and applied then. On
- * every later click readyState is already past that and it applies immediately.
- */
-function seekTo(audio, secs) {
-  const apply = () => { try { audio.currentTime = secs } catch { /* not seekable */ } }
-  if (audio.readyState >= 1) apply()
-  else audio.addEventListener('loadedmetadata', apply, { once: true })
-  const p = audio.play()
-  if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay policy */ })
-}
-
 /* The notes drawer, repainted from the token tree the endpoint returns.
  *
  * ⚠️ TOKENS, NEVER HTML. Each paragraph is an array of { t: 'text' } and
@@ -285,69 +272,121 @@ function paintNotes(notes) {
   drawer.hidden = false
 }
 
-function paintChapters(chapters) {
+// ── The player, and the chapters and songs it plays ──────────────────
+//
+/* The page's <audio> becomes the player bar (player.js), which draws a tick
+ * at each chapter and a stretch for each song. The drawer under it lists both
+ * in ONE list, by start time, as two kinds of row:
+ *
+ *   a chapter   its time and title; a click seeks there
+ *   a song      ♪, its title, its album or artist, and its heart, from the
+ *               episode's <podcast:valueTimeSplit> windows (/api/episode-songs)
+ *
+ * ⚠️ A HEART RIDES A SONG ROW, NEVER A CHAPTER. A chapter is not mapped to a
+ * window even when one looks like the other: on some shows they overlap and
+ * "the window covering this chapter" names the wrong song (BMB's rule). The
+ * heart is a sibling of the seek button, not a child, because a button inside
+ * a button is invalid and the inner one would never receive its own click.
+ * It is the site's ordinary episode heart for the song's own feed and item,
+ * so favorites-ui.js reveals and paints it the way it does every other.
+ */
+const audioEl = document.querySelector('.ep-player-row .pcast-player')
+const player = audioEl && EPISODE
+  ? mountPlayer(audioEl, { itemGuid: EPISODE.itemGuid, duration: EPISODE.duration })
+  : null
+
+function songHeartNode(song) {
+  if (!song?.feedGuid || !song?.itemGuid) return null
+  const html = favoriteButtonHtml({
+    kind: 'episode', guid: song.feedGuid, itemGuid: song.itemGuid,
+    medium: 'music', label: song.title || 'this song',
+  })
+  if (!html) return null
+  const t = document.createElement('template')
+  t.innerHTML = html
+  return t.content.firstElementChild
+}
+
+function rowButton(secs, titleText, subText) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'ep-chapter-btn'
+  const time = document.createElement('span')
+  time.className = 'ep-chapter-time'
+  time.textContent = fmtChapterTime(secs)
+  const title = document.createElement('span')
+  title.className = 'ep-chapter-title'
+  // textContent throughout: every title here is a publisher's string from a
+  // third-party file, so none of it touches innerHTML.
+  title.textContent = titleText
+  btn.append(time, title)
+  if (subText) {
+    const sub = document.createElement('span')
+    sub.className = 'ep-chapter-sub'
+    sub.textContent = subText
+    btn.appendChild(sub)
+  }
+  btn.addEventListener('click', () => player?.seek(secs))
+  return btn
+}
+
+function paintContents(chapters, songs) {
   const drawer = document.querySelector('[data-chapters]')
-  const audio = document.querySelector('.ep-player-row .pcast-player')
+  const list = drawer?.querySelector('[data-chapters-list]')
+  const chs = Array.isArray(chapters) ? chapters : []
+  const sgs = Array.isArray(songs) ? songs.filter((s) => Number(s.duration) > 0) : []
+  if (player) {
+    player.setChapters(chs)
+    player.setSongs(sgs, { heart: songHeartNode })
+  }
   // Nothing to show is the ordinary outcome, not a failure: the drawer stays
   // hidden and the page is the page it was before.
-  if (!drawer || !audio || !Array.isArray(chapters) || !chapters.length) return
+  if (!drawer || !list || !player || (!chs.length && !sgs.length)) return
 
-  const list = drawer.querySelector('[data-chapters-list]')
-  if (!list) return
+  const rows = [
+    ...chs.map((c) => ({ kind: 'chapter', start: Math.max(0, Math.floor(Number(c.start) || 0)), c })),
+    ...sgs.map((s) => ({ kind: 'song', start: Math.max(0, Math.floor(Number(s.start) || 0)), s })),
+  ].sort((a, b) => a.start - b.start || (a.kind === 'chapter' ? -1 : 1))
 
-  const starts = []
-  const buttons = []
+  const chapterBtns = new Map(), songBtns = new Map()
   const frag = document.createDocumentFragment()
-  for (const c of chapters) {
-    const secs = Math.max(0, Math.floor(Number(c.start) || 0))
+  for (const r of rows) {
     const li = document.createElement('li')
-    li.className = 'ep-chapter'
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'ep-chapter-btn'
-    const time = document.createElement('span')
-    time.className = 'ep-chapter-time'
-    time.textContent = fmtChapterTime(secs)
-    const title = document.createElement('span')
-    title.className = 'ep-chapter-title'
-    // textContent throughout: a chapter title is a publisher's string arriving
-    // from a third-party file, so it never touches innerHTML.
-    title.textContent = String(c.title || '')
-    btn.append(time, title)
-    btn.addEventListener('click', () => seekTo(audio, secs))
-    li.appendChild(btn)
+    if (r.kind === 'chapter') {
+      li.className = 'ep-chapter'
+      const btn = rowButton(r.start, String(r.c.title || ''), null)
+      li.appendChild(btn)
+      chapterBtns.set(r.c, btn)
+    } else {
+      li.className = 'ep-chapter ep-song'
+      const who = r.s.artist || r.s.album || ''
+      const btn = rowButton(r.start, '♪ ' + (r.s.title || 'A song'), who)
+      li.appendChild(btn)
+      const heart = songHeartNode(r.s)
+      if (heart) li.appendChild(heart)
+      songBtns.set(r.s, btn)
+    }
     frag.appendChild(li)
-    starts.push(secs)
-    buttons.push(btn)
   }
-  list.appendChild(frag)
+  list.replaceChildren(frag)
+
+  // The drawer is named for what it holds.
+  const summary = drawer.querySelector('summary')
+  const label = summary && [...summary.childNodes].find((n) => n.nodeType === 3)
+  if (label) label.textContent = chs.length && sgs.length ? 'Chapters and Songs' : sgs.length ? 'Songs' : 'Chapters'
   drawer.hidden = false
 
-  // The row covering the playhead, tracked as it advances. The last chapter
-  // whose start is at or behind the current time wins; the quarter-second
-  // tolerance is so a click-seek lands on the chapter it came from rather than
-  // the one before it.
-  let active = -1
-  const syncActive = () => {
-    const t = audio.currentTime
-    let idx = -1
-    for (let i = 0; i < starts.length; i++) {
-      if (starts[i] <= t + 0.25) idx = i
-      else break
-    }
-    if (idx === active) return
-    if (active >= 0) {
-      buttons[active].classList.remove('is-active')
-      buttons[active].removeAttribute('aria-current')
-    }
-    active = idx
-    if (idx >= 0) {
-      buttons[idx].classList.add('is-active')
-      buttons[idx].setAttribute('aria-current', 'true')
-    }
-  }
-  audio.addEventListener('timeupdate', syncActive)
-  audio.addEventListener('seeked', syncActive)
+  // The rows covering the playhead, tracked as it advances: the chapter it is
+  // in and the song it is in, which can both be lit at once.
+  let lit = []
+  player.subscribe((st) => {
+    for (const b of lit) { b.classList.remove('is-active'); b.removeAttribute('aria-current') }
+    lit = []
+    const c = st.chapter && chs.find((x) => Math.floor(Number(x.start) || 0) === Math.floor(st.chapter.start) && String(x.title || '') === st.chapter.title)
+    const cb = c && chapterBtns.get(c)
+    const sb = st.song && songBtns.get(st.song)
+    for (const b of [cb, sb]) if (b) { b.classList.add('is-active'); b.setAttribute('aria-current', 'true'); lit.push(b) }
+  })
 }
 
 async function initEpisodeMeta() {
@@ -360,19 +399,27 @@ async function initEpisodeMeta() {
   if (EPISODE.guid) qs.set('podcastGuid', EPISODE.guid)
   if (EPISODE.feed) qs.set('feedUrl', EPISODE.feed)
 
-  let data = null
-  try {
-    const resp = await fetch(`/api/episode-meta?${qs}`, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) return
-    data = await resp.json()
-  } catch { return }
-  if (!data) return
+  const getJson = async (url) => {
+    try {
+      const resp = await fetch(url, { headers: { Accept: 'application/json' } })
+      return resp.ok ? await resp.json() : null
+    } catch { return null }
+  }
+  // The songs come from the show's own RSS rather than Podcast Index, so they
+  // are a second call, made beside the first; either may fail alone.
+  const songsQs = EPISODE.feed && player
+    ? new URLSearchParams({ guid: EPISODE.itemGuid, feedUrl: EPISODE.feed })
+    : null
+  const [data, songs] = await Promise.all([
+    getJson(`/api/episode-meta?${qs}`),
+    songsQs ? getJson(`/api/episode-songs?${songsQs}`) : null,
+  ])
 
   // `notes` absent means the lookup told us nothing, where an empty array would
   // mean the episode has none — and the difference matters, because the server
   // already rendered a truncated set that must not be blanked by a miss.
-  paintNotes(data.notes)
-  paintChapters(data.chapters)
+  if (data) paintNotes(data.notes)
+  paintContents(data?.chapters, songs?.songs)
 }
 
 initEpisodeMeta()

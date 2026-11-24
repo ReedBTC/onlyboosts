@@ -51,6 +51,127 @@
   display: block;
 }
 
+/* ── The player bar (assets/js/player.js) ─────────────────────────────────
+   The native control above is the no-JavaScript reading; with JavaScript it is
+   hidden and this bar drives the same element. One ground, one hairline, the
+   brand as the only colour: the fill, the song stretches at a tint of it, and
+   the chapter ticks as hairlines across the line. */
+.obp {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.obp button {
+  flex: none;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.obp button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* A filled brand button is --brand-dd: --brand on white fails AA. */
+.obp .obp-play {
+  width: 2.6rem; height: 2.6rem;
+  /* #fff, not --white: --white is the card surface, dark in dark mode. */
+  background: var(--brand-dd); border-color: var(--brand-dd); color: #fff;
+  font-size: 0.95rem; line-height: 1;
+}
+.obp .obp-skip, .obp .obp-rate {
+  min-width: 2.6rem; height: 2rem; padding: 0 0.5rem;
+  font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.obp button:hover { border-color: var(--brand); }
+.obp-main { flex: 1; min-width: 0; }
+.obp-now {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.82rem; font-weight: 600; color: var(--ink);
+  min-height: 1.6rem;
+}
+.obp-now-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obp-now-heart { flex: none; }
+
+.obp-track {
+  position: relative;
+  height: 1.1rem;
+}
+/* The line itself, the songs on it, the fill and the ticks are all drawn in
+   the middle 6px of the track; the range input over them is the control. */
+.obp-track::before, .obp-songs, .obp-fill, .obp-ticks {
+  position: absolute; left: 0; top: 50%; height: 6px; margin-top: -3px;
+  border-radius: 3px; pointer-events: none;
+}
+.obp-track::before { content: ""; right: 0; background: var(--cream); }
+.obp-songs { right: 0; }
+.obp-song {
+  position: absolute; top: 0; bottom: 0;
+  /* The brand at low strength: a token, not a new colour. */
+  background: var(--brand); opacity: 0.32;
+  border-left: 1px solid var(--white);
+}
+.obp-fill { background: var(--brand); opacity: 0.85; }
+.obp-ticks { right: 0; overflow: visible; }
+.obp-tick {
+  position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px;
+  background: var(--ink); opacity: 0.45; border-radius: 1px;
+}
+.obp-range {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer;
+}
+.obp-range::-webkit-slider-runnable-track { background: transparent; height: 100%; }
+.obp-range::-moz-range-track { background: transparent; }
+.obp-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: 0.1rem; border-radius: 50%;
+  background: var(--brand-dd); border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--brand-dd);
+}
+.obp-range::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--brand-dd); border: 2px solid var(--white);
+}
+.obp-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+.obp-times {
+  display: flex; justify-content: space-between;
+  font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+
+/* Docked: playing, with its place scrolled out of view. Fixed to the bottom
+   of the window, full width, with the hairline on top only. */
+.obp.is-docked {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  border-radius: 0; border-width: 1px 0 0;
+  padding: 0.55rem max(0.75rem, env(safe-area-inset-right)) calc(0.55rem + env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+}
+@media (min-width: 900px) {
+  .obp.is-docked { padding-left: max(1.5rem, calc((100vw - 1100px) / 2)); padding-right: max(1.5rem, calc((100vw - 1100px) / 2)); }
+}
+/* Room at the foot of the page, so the docked bar never sits over its last
+   line. */
+html.obp-docked body { padding-bottom: 5.5rem; }
+
+@media (max-width: 520px) {
+  .obp { gap: 0.4rem; padding: 0.5rem; }
+  .obp .obp-skip { min-width: 2.2rem; padding: 0 0.3rem; }
+  .obp .obp-rate { display: none; }
+}
+
+/* A song row in the chapters drawer: the seek button and, beside it, the
+   song's heart. */
+.ep-song { display: flex; align-items: center; }
+.ep-song .ep-chapter-btn { flex: 1; min-width: 0; flex-wrap: wrap; }
+.ep-song > [data-fav] { flex: none; margin-right: 0.75rem; }
+.ep-chapter-sub {
+  flex-basis: 100%;
+  margin-left: 3.95rem;
+  font-size: 0.8rem; color: var(--muted);
+}
+
 /* ── The player card, and the two drawers inside it ───────────────────── */
 
 /* ONE CARD holds the artwork, the title, the actions, the player, the chapters
