@@ -447,6 +447,47 @@ Clicking a chapter row seeks the player and starts it. The element is
 `currentTime` is dropped — `play()` triggers the load, so the assignment is
 queued behind `loadedmetadata`.
 
+### The Episode Player And Its Songs
+
+Built 2026-11-24 at Reed's request: the bar under the `/episode` hero is
+`assets/js/player.js`, which takes the controls off the page's own `<audio>`
+(the no-JavaScript reading) and drives it. The seek line on top, carrying a
+tick wherever a chapter or a song begins; under it, on a row of their own
+(Reed, 2026-11-24: beside the buttons the line was too short on a phone),
+previous chapter, back 15, play, forward 30, next chapter, and the speed.
+
+- **Previous and next stop where the ticks are** (`markStarts`): previous goes
+  to the start of what is playing, or to the one before within its first 3
+  seconds; the episode's start is always a stop. With no chapters and no songs
+  the two buttons are hidden.
+
+- **The songs are the episode's `<podcast:valueTimeSplit>` windows**, read from
+  the show's RSS by `/api/episode-songs` (`functions/_shared/time-splits.js`) and
+  named by our index first, Podcast Index second (the episode record for the title, the album feed for the artist; a row shows "Song - Artist", or the title alone when no artist is known). Only a window with a
+  `remoteItem` is a song; a window of inline recipients is counted and left
+  alone. Measured 2026-11-24: Two For Tunestr's latest episode has 19, Homegrown
+  Hits' 15, and the index names about half of each.
+- **⚠️ CHAPTERS AND SONGS ARE TWO ROW TYPES IN ONE LIST, AND A HEART RIDES A SONG
+  ROW ONLY.** A chapter is never mapped to a window, even when one looks like
+  the other (BMB's rule: they overlap on some shows, and the covering window
+  names the wrong song). The heart is the ordinary episode heart for the song's
+  own feed and item, a sibling of the seek button.
+- **A chapter that starts within 2 seconds of a song is dropped**, since many
+  music shows write a chapter per song too and the list showed each song twice
+  (Reed, 2026-11-24). Only a chapter is ever dropped, never a song.
+- **The seek line has ticks only**, one where each chapter or song begins. The
+  first build shaded each song's stretch in the brand colour; Reed: it reads as
+  something unexplained.
+- **⚠️ IT DOCKS, IT DOES NOT FOLLOW.** Once playing, the bar fixes itself to the
+  bottom of the window while its place is scrolled out of view, and returns
+  when it comes back. It does not survive a navigation: every link is a full
+  page load, and a site-wide player is a navigation change (Reed, 2026-11-23,
+  "maybe someday"), which is why the module owns the audio.
+- **`window.LBPlayer.state()`** is the read side for the boost button:
+  `{ itemGuid, positionSec, playing, started, song, chapter }`. `started` is a
+  position past zero, never zero, so a window authored at 0 cannot claim a
+  boost pressed before anyone pressed play.
+
 ### `/booster/<npub>`
 
 The third detail page, and the newest. `functions/booster/[npub].js` +
