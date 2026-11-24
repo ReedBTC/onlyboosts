@@ -111,9 +111,9 @@ exactly one version of one file; that is what closed the `ob-v53` outage (one
 stale module took down all eight feeds). Adding a named export to a shared
 module is ordinary work since then.
 
-**Thirty-three test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
+**Thirty-four test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
 is the per-test reference; **bump the count here and that file together.** Run
-all thirty-three before a merge.
+all thirty-four before a merge.
 
 - **⚠️ `test-server-render.mjs` NEEDS A FRESH CAPTURE** and is the one that goes
   unrun: `curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25' -o <file>`
@@ -332,6 +332,8 @@ Reasoning in `docs/feature-rules.md`, `docs/detail-pages.md`, `docs/favorites.md
 - **`/booster` passes `#boosts` to `hydrateProfiles`**; the other pages pass nothing.
 - **`/episode` 302s to the show on a miss**; the fix for a stale episode field
   belongs in the collector, never a repair at the edge.
+- **The `/episode` player is `player.js`**: it docks while playing, never follows across pages, and a
+  song's heart rides a song row, never a chapter (`docs/detail-pages.md`).
 - **The heart ships `hidden`** and is revealed for a signed-in member only. A
   podcast show is Followed; everything else is Favorited. The favorites merge is
   the spec's reference implementation, vendored from main, never a PR branch.
