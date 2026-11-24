@@ -230,6 +230,11 @@ def build_full_sql(conn):
     out.extend(build_podroll_sql(conn))
     out.extend(build_publishers_sql(conn))
     out.extend(build_similar_sql(conn))
+    out.extend(CREDITS_DDL)
+    out.append("DELETE FROM boost_credits;")
+    out.extend(_credit_insert_sql(c) for c in conn.execute(
+        f"""SELECT c.* FROM boost_credits c JOIN boosts b ON b.event_id = c.event_id
+            WHERE {db.not_excluded('b')}""").fetchall())
 
     s = db.stats(conn)
     for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
@@ -558,6 +563,61 @@ def build_edge_sql(conn, edge_rows, delta_rows, now, delta_pods=(), delta_items=
     return out, counts
 
 
+# ── the split credits: `boost_credits` (split_credit.py) ─────────────────────
+# Pushed in a batch of their own AFTER the boost delta has landed, and a failed
+# credit batch is a warning, not a failed cycle: the table is new, a remote that
+# has not had the schema applied answers 400 to every statement naming it, and
+# that must never stop boosts reaching D1. Rows go once (`d1_synced`); a rewrite
+# un-syncs them; a dropped boost's credits leave through the 'credit' kind of the
+# reproject queue, drained here and nowhere else for the same reason.
+# The table creates itself on first push, the way the edge's `boosts_edge` does,
+# so the merge is the deploy; d1/schema.sql carries the same DDL for a rebuild.
+CREDITS_DDL = [
+    "CREATE TABLE IF NOT EXISTS boost_credits (event_id TEXT NOT NULL, role TEXT NOT NULL, "
+    "podcast_guid TEXT, item_guid TEXT NOT NULL, sats INTEGER NOT NULL, pct REAL, "
+    "method TEXT NOT NULL, PRIMARY KEY (event_id, role));",
+    "CREATE INDEX IF NOT EXISTS idx_credits_podcast ON boost_credits(podcast_guid);",
+    "CREATE INDEX IF NOT EXISTS idx_credits_item ON boost_credits(item_guid);",
+]
+
+
+def _credit_insert_sql(c):
+    return ("INSERT OR REPLACE INTO boost_credits (event_id,role,podcast_guid,item_guid,"
+            "sats,pct,method) VALUES ("
+            f"{q(c['event_id'])},{q(c['role'])},{q(c['podcast_guid'])},{q(c['item_guid'])},"
+            f"{q(c['sats'])},{q(c['pct'])},{q(c['method'])});")
+
+
+def build_credits_sql(conn, queue):
+    """(statements, rows to mark synced, reproject pairs to clear)."""
+    out, pairs = list(CREDITS_DDL), []
+    for event_id in queue.get("credit", []):
+        out.append(f"DELETE FROM boost_credits WHERE event_id={q(event_id)};")
+        pairs.append(("credit", event_id))
+    rows = conn.execute(
+        f"""SELECT c.* FROM boost_credits c JOIN boosts b ON b.event_id = c.event_id
+            WHERE c.d1_synced = 0 AND {db.not_excluded('b')}""").fetchall()
+    out.extend(_credit_insert_sql(c) for c in rows)
+    return out, [(c["event_id"], c["role"], c["checked_at"]) for c in rows], pairs
+
+
+def push_credits(conn, cf):
+    """Push the credit delta; returns a log line, or None when there was nothing."""
+    stmts, synced, pairs = build_credits_sql(conn, db.reproject_queue(conn))
+    if len(stmts) == len(CREDITS_DDL):
+        return None
+    for i in range(0, len(stmts), 100):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + 100]))
+        if not ok:
+            return (f"[warn] split credits not pushed (batch {i // 100}): {detail} "
+                    "-- has d1/schema.sql been applied? Boosts are unaffected.")
+    conn.executemany("UPDATE boost_credits SET d1_synced=1 "
+                     "WHERE event_id=? AND role=? AND checked_at=?", synced)
+    conn.commit()
+    db.clear_reproject_queue(conn, pairs)
+    return f"D1 credits: pushed {len(synced)} split credit row(s), removed {len(pairs)} boost(s)' credits"
+
+
 def build_reproject_sql(conn, queue):
     """SQL for the `d1_reproject` queue — rows the boost delta can't reach.
 
@@ -792,6 +852,7 @@ def cmd_remote(args):
     # marker is what keeps the next delta from re-adding them. apply_excludes
     # un-marks any that come off the list.
     _mark_synced(conn, [r["event_id"] for r in conn.execute("SELECT event_id FROM boosts").fetchall()])
+    conn.execute("UPDATE boost_credits SET d1_synced=1")
     # Everything is projected as of `started`, so the drift pass starts from here.
     _set_watermark(conn, META_WATERMARK, started)
     # A full load already reflects the exclusion list; a queued re-derivation of it
@@ -847,6 +908,9 @@ def cmd_remote_delta(args):
     if not stmts:
         print("D1 delta: nothing new to sync")
         _set_watermark(conn, META_WATERMARK, started)
+        line = push_credits(conn, cf)
+        if line:
+            print(line)
         return
 
     BATCH = 100
@@ -874,6 +938,9 @@ def cmd_remote_delta(args):
     if skipped:
         print(f"  skipped {skipped} newly-boosted episode(s) with no metadata row "
               f"(standing enrichment gap: {db.enrichment_gap_size(conn)})")
+    line = push_credits(conn, cf)
+    if line:
+        print(line)
 
 
 def cmd_remote_podroll(args):

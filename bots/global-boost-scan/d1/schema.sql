@@ -32,6 +32,31 @@ CREATE INDEX IF NOT EXISTS idx_boosts_podcast ON boosts(podcast_guid, created_at
 CREATE INDEX IF NOT EXISTS idx_boosts_item    ON boosts(item_guid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_boosts_booster ON boosts(booster_pubkey, created_at DESC);
 
+-- Value-time-split dual credit (split_credit.py). A boost made while a host
+-- episode played someone else's song has two rows here, role 'track' and role
+-- 'host', and is counted through them: sats by `sats` (the two add up to the
+-- boost's), the boost and its booster once on each side. A boost with no rows
+-- here is counted through `boosts` as before; the `boosts` row of a split boost
+-- is unchanged, so its podcast_guid / item_guid may name either side.
+-- `pct` is the track's share as the host feed wrote it (0-100); NULL means
+-- unknown, the track row then carries every sat and the host row 0. `method`:
+-- 'rss' measured from the host's valueTimeSplit, 'medium' / 'tag' inferred.
+-- The collector pushes these in a batch of their own, after the boost delta,
+-- and that batch opens with this same DDL (d1_sync.CREDITS_DDL), so the table
+-- creates itself; a failed credit batch costs the credits and nothing else.
+CREATE TABLE IF NOT EXISTS boost_credits (
+  event_id     TEXT NOT NULL,
+  role         TEXT NOT NULL,          -- 'track' | 'host'
+  podcast_guid TEXT,
+  item_guid    TEXT NOT NULL,
+  sats         INTEGER NOT NULL,
+  pct          REAL,
+  method       TEXT NOT NULL,          -- 'rss' | 'medium' | 'tag'
+  PRIMARY KEY (event_id, role)
+);
+CREATE INDEX IF NOT EXISTS idx_credits_podcast ON boost_credits(podcast_guid);
+CREATE INDEX IF NOT EXISTS idx_credits_item    ON boost_credits(item_guid);
+
 CREATE TABLE IF NOT EXISTS podcasts (
   podcast_guid  TEXT PRIMARY KEY,
   title         TEXT,
