@@ -22,22 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v303'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v303'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v303'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v303'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v303'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v305'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v305'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v305'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v305'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v305'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v303'
+} from '/assets/js/detail-page.js?v=ob-v305'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v303'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v303'
-import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v303'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v303'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v305'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v305'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v305'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v305'
 
 const VALUE_API = '/api/value'
 
