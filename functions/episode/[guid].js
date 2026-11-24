@@ -35,6 +35,7 @@ import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 
 import { headOf } from "../_shared/head.js";
+import { CREDITED, CREDIT_ROW_COLS, CREDIT_ROW_JOINS } from "../_shared/credited.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 
 // ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL, exactly as on /show/<guid>:
@@ -129,9 +130,9 @@ export async function onRequestGet(context) {
       // boosters swap places between renders.
       `SELECT b.booster_pubkey, b.booster_npub,
               SUM(COALESCE(b.sats, 0)) AS sats,
-              COUNT(*)                 AS boosts,
+              COUNT(DISTINCT b.event_id) AS boosts,
               pr.name, pr.display_name, pr.picture
-       FROM boosts b
+       FROM ${CREDITED} b
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE b.item_guid = ?
        GROUP BY b.booster_pubkey
@@ -139,11 +140,12 @@ export async function onRequestGet(context) {
        LIMIT ?`
     ).bind(guid, BOOSTS_CAP).all(),
     env.DB.prepare(
-      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
+              ${CREDIT_ROW_COLS},
               b.message, b.client_id, pr.name AS pr_name, pr.display_name AS pr_dname,
               pr.picture AS pr_pic
-       FROM boosts b
-       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       FROM ${CREDITED} b
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey${CREDIT_ROW_JOINS}
        WHERE b.item_guid = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(guid, BOOSTS_CAP).all(),
@@ -152,7 +154,7 @@ export async function onRequestGet(context) {
     // is derived. One indexed lookup through idx_boosts_item.
     env.DB.prepare(
       `SELECT COUNT(DISTINCT booster_pubkey) AS n, MAX(created_at) AS latest
-       FROM boosts WHERE item_guid = ?`
+       FROM ${CREDITED} cb WHERE item_guid = ?`
     ).bind(guid).first(),
     fetchCommunityBoosts(env, guid, ep.podcast_guid, ep.p_medium).catch((err) => {
       console.warn("[episode] community corpus unavailable", err);
@@ -428,22 +430,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v294" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v294" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v294" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -859,12 +861,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v293" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v293" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v294" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v294" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v293"></script>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v294"></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
 }
@@ -1216,7 +1218,7 @@ async function noEpisodePage(env, guid) {
   try {
     row = await env.DB.prepare(
       `SELECT b.podcast_guid AS guid
-       FROM boosts b
+       FROM ${CREDITED} b
        JOIN podcasts p ON p.podcast_guid = b.podcast_guid
        WHERE b.item_guid = ? AND b.podcast_guid IS NOT NULL
          AND p.title IS NOT NULL AND p.title <> ''
@@ -1250,10 +1252,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
 </head>
 <body>
 <section class="page-header">
@@ -1271,7 +1273,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
   return new Response(html, {

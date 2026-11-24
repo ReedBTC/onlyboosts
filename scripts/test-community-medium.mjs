@@ -28,6 +28,7 @@
  *
  * Run: node scripts/test-community-medium.mjs
  */
+import { CREDITED } from '../functions/_shared/credited.js'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
@@ -169,6 +170,7 @@ await check('the extracted query still carries a medium clause at all', () => {
 
 const runShow = (guid, isMusic) => {
   const sql = rawSql.replace(/\$\{isMusic \? "=" : "<>"\}/, isMusic ? '=' : '<>')
+    .replace(/\$\{CREDITED\}/g, CREDITED)
   assert.ok(!sql.includes('${'), 'an unsubstituted interpolation reached sqlite')
   return db.prepare(sql).all(guid, guid, 150).map((r) => r.title)
 }

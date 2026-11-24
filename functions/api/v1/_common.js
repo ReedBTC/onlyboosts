@@ -12,6 +12,8 @@ const ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:5173",
 ]);
 
+import { CREDITED, CREDIT_ROW_COLS, CREDIT_ROW_JOINS } from "../../_shared/credited.js";
+
 export function corsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
   const allow = ALLOWED_ORIGINS.has(origin) ? origin : "https://onlyboosts.social";
@@ -185,6 +187,40 @@ export const BOOST_SELECT = `
   LEFT JOIN episodes e ON e.item_guid    = b.item_guid
   LEFT JOIN profiles pr ON pr.pubkey     = b.booster_pubkey`;
 
+/* BOOST_SELECT for a list about ONE show, episode, song or artist: the same
+ * columns over the credited rows (functions/_shared/credited.js), so a boost
+ * made during a song is listed on the song AND the host episode, each row
+ * naming the other side. `sats` stays what the booster sent. Never for the
+ * Boosts feed or a booster's own list, which list each boost once. */
+export const CREDITED_BOOST_SELECT = `
+  SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
+         ${CREDIT_ROW_COLS},
+         b.amount_source, b.podcast_guid, b.item_guid, b.item_url, b.client, b.message,
+         b.client_id, b.client_via,
+         p.title AS p_title, p.image AS p_image, p.feed_url AS p_feed,
+         e.title AS e_title, e.image AS e_image, e.published AS e_pub,
+         e.episode_number AS e_num, e.enclosure_url AS e_url,
+         pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
+  FROM ${CREDITED} b
+  LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
+  LEFT JOIN episodes e ON e.item_guid    = b.item_guid
+  LEFT JOIN profiles pr ON pr.pubkey     = b.booster_pubkey${CREDIT_ROW_JOINS}`;
+
+/* The split of a boost made during a song, on a record from a credited list;
+ * absent on every other record. `role` is which side this listing is: the
+ * 'track' (the song) or the 'host' (the show's episode). `pct` is the song's
+ * share as the feed wrote it, null when unknown. */
+export function creditRecord(r) {
+  if (!r.credit_role) return null;
+  return {
+    role: r.credit_role, pct: r.credit_pct ?? null, sats: r.credit_sats ?? null,
+    other: {
+      guid: r.other_guid ?? null, item: r.other_item ?? null, sats: r.other_sats ?? null,
+      title: r.other_title ?? null, show: r.other_show ?? null,
+    },
+  };
+}
+
 export function boostRecord(r) {
   return {
     id: r.event_id,
@@ -216,6 +252,7 @@ export function boostRecord(r) {
       guid: r.item_guid, title: r.e_title, img: r.e_image || r.p_image,
       date: r.e_pub, num: r.e_num, url: r.e_url || r.item_url,
     },
+    ...(r.credit_role ? { credit: creditRecord(r) } : {}),
   };
 }
 

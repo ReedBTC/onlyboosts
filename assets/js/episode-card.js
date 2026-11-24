@@ -42,13 +42,14 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v293'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v293'
-import { episodeBoostLink } from './episode-link.js?v=ob-v293'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v293'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v293'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v293'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v293'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v294'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v294'
+import { episodeBoostLink } from './episode-link.js?v=ob-v294'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v294'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v294'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v294'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v294'
+import { splitLineHtml } from './boost-list.js?v=ob-v294'
 
 const esc = htmlEscape
 
@@ -922,7 +923,7 @@ function boostRowHtml(b, profiles, names) {
     attr('data-npub', b.booster_npub) +
     attr('data-ts', b.created_at) +
     (missing ? ` data-pk="${esc(b.booster_pubkey)}" data-missing="${esc(missing)}"` : '') +
-    `>${head}${msgEl}</div>`
+    `>${head}${splitLineHtml(b)}${msgEl}</div>`
 }
 
 /* Per-boost overflow (⋮) menu — copy npub, copy nevent.

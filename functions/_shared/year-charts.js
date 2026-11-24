@@ -21,6 +21,7 @@
 
 import { weekStartFromDate, nextWeek, pacificOffset, WEEK, MONDAY_EPOCH } from "../../assets/js/pacific-week.js";
 import { weeklyChart } from "./week-charts.js";
+import { CREDITED } from "./credited.js";
 import { PUBLISHERS } from "../api/v1/_common.js";
 import { pacificOffsetSql, GOAL_HOURS } from "../api/v1/members/hours.js";
 
@@ -96,7 +97,7 @@ export async function yearStats(env, ys, ye) {
     `SELECT COUNT(DISTINCT CASE WHEN COALESCE(pc.medium,'podcast') <> 'music' THEN b.podcast_guid END) AS podcasts,
             COUNT(DISTINCT CASE WHEN COALESCE(pc.medium,'podcast') = 'music' THEN b.item_guid END) AS songs,
             COUNT(DISTINCT CASE WHEN COALESCE(pc.medium,'podcast') = 'music' THEN pc.publisher_guid END) AS artists
-       FROM boosts b LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+       FROM ${CREDITED} b LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
       WHERE b.created_at >= ? AND b.created_at < ?`).bind(ys, ye).first();
   const newQ = env.DB.prepare(
     `SELECT COUNT(*) AS n FROM (

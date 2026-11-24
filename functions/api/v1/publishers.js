@@ -32,6 +32,7 @@
 // partition reading applies: COALESCE(medium,'podcast'), so an unidentified
 // declaring feed is not music and does not count.
 import { json, preflight, clampLimit, toHexPubkey, readLang, langWhere } from "./_common.js";
+import { CREDITED } from "../../_shared/credited.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -39,7 +40,7 @@ export async function onRequestOptions({ request }) { return preflight(request);
 // ranking CTE and the ORDER BY read. No `col` half here — there is no
 // precomputed path to name a column on.
 const SORTS = {
-  boosts:   { agg: "COUNT(*)",                         alias: "boost_count" },
+  boosts:   { agg: "COUNT(DISTINCT b.event_id)",       alias: "boost_count" },
   sats:     { agg: "COALESCE(SUM(b.sats),0)",          alias: "total_sats" },
   boosters: { agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
   latest:   { agg: "MAX(b.created_at)",                alias: "latest_ts" },
@@ -209,13 +210,13 @@ export async function globalPublishers(env, p) {
   const base = `
     SELECT pub.publisher_guid                  AS guid,
            pub.title, pub.image, pub.artwork, pub.feed_url, pub.show_count,
-           COUNT(*)                            AS boost_count,
+           COUNT(DISTINCT b.event_id)          AS boost_count,
            COALESCE(SUM(b.sats),0)             AS total_sats,
            COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
            MAX(b.created_at)                   AS latest_ts
     FROM publishers pub
     JOIN podcasts pc ON pc.publisher_guid = pub.publisher_guid
-    JOIN boosts b    ON b.podcast_guid    = pc.podcast_guid
+    JOIN ${CREDITED} b ON b.podcast_guid  = pc.podcast_guid
     WHERE ${where.join(" AND ")}
     GROUP BY pub.publisher_guid`;
 

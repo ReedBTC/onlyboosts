@@ -65,6 +65,7 @@ import { showPageHref } from "../assets/js/show-link.js";
 import { heroHtml, showSlide, episodeSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
 import { headOf, assetGet } from "./_shared/head.js";
 import { PUBLISHERS } from "./api/v1/_common.js";
+import { CREDITED } from "./_shared/credited.js";
 
 const TILES = 10;
 
@@ -143,11 +144,15 @@ export async function newShowsRows(env, limit, side) {
   const bots = PUBLISHERS.map((k) => `'${k}'`).join(",");
   const podcast = `COALESCE(p.title, '') <> '' AND COALESCE(p.medium, 'podcast') <> 'music'
           AND (p.newest_item_ts IS NULL OR p.newest_item_ts >= ?4)`;
+  /* The window is counted through the credits (a show whose week was a run of
+   * songs played on it is active that week); the look-back for its previous
+   * boost stays on `boosts`, since a correlated lookup into the credited
+   * UNION ALL cannot use idx_boosts_podcast and would read every boost. */
   const { results } = await env.DB.prepare(
     `WITH w AS (
        SELECT podcast_guid AS guid, MIN(created_at) AS first_in, COALESCE(SUM(sats), 0) AS sats_w,
               COUNT(DISTINCT CASE WHEN booster_pubkey NOT IN (${bots}) THEN booster_pubkey END) AS boosters_w
-         FROM boosts WHERE created_at >= ?1 AND podcast_guid IS NOT NULL GROUP BY podcast_guid
+         FROM ${CREDITED} cb WHERE created_at >= ?1 AND podcast_guid IS NOT NULL GROUP BY podcast_guid
      ), back AS (
        SELECT w.*, (SELECT MAX(b.created_at) FROM boosts b WHERE b.podcast_guid = w.guid AND b.created_at < w.first_in) AS prev_ts FROM w
      )

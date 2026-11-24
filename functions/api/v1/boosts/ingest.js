@@ -56,6 +56,7 @@
 import { corsHeaders, preflight } from "../_common.js";
 import { validateBoostTemplate } from "../../sign-boost.js";
 import { verifyEvent, nip19 } from "../../../_shared/nostr-sign.js";
+import { CREDITED } from "../../../_shared/credited.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -207,25 +208,29 @@ export function validateSubmission(body) {
 }
 
 // The five figures the collector projects onto a show, recomputed from every
-// boost D1 holds for it. Same formulas as `_podcast_upsert_sql` in d1_sync.py
+// boost D1 holds for it, counted through the credits (functions/_shared/
+// credited.js): a boost made during a song counts on the song and on the host
+// at its share, exactly as the collector's db.credited_rows() counts it. A
+// recount over plain `boosts` here would undo the collector's figures for
+// every show this site's own boosts land on. Same formulas as `_podcast_upsert_sql` in d1_sync.py
 // (that one reads the box database through the alias map; this one reads D1,
 // which is why the collector's replace is the last word).
 const PODCAST_RECOUNT = `
   UPDATE podcasts SET
-    boost_count   = (SELECT COUNT(*)                        FROM boosts WHERE podcast_guid = ?),
-    total_sats    = (SELECT COALESCE(SUM(sats), 0)          FROM boosts WHERE podcast_guid = ?),
-    booster_count = (SELECT COUNT(DISTINCT booster_pubkey)  FROM boosts WHERE podcast_guid = ?),
-    episode_count = (SELECT COUNT(DISTINCT item_guid)       FROM boosts WHERE podcast_guid = ?),
-    latest_ts     = (SELECT MAX(created_at)                 FROM boosts WHERE podcast_guid = ?)
+    boost_count   = (SELECT COUNT(DISTINCT event_id)        FROM ${CREDITED} cb WHERE podcast_guid = ?),
+    total_sats    = (SELECT COALESCE(SUM(sats), 0)          FROM ${CREDITED} cb WHERE podcast_guid = ?),
+    booster_count = (SELECT COUNT(DISTINCT booster_pubkey)  FROM ${CREDITED} cb WHERE podcast_guid = ?),
+    episode_count = (SELECT COUNT(DISTINCT item_guid)       FROM ${CREDITED} cb WHERE podcast_guid = ?),
+    latest_ts     = (SELECT MAX(created_at)                 FROM ${CREDITED} cb WHERE podcast_guid = ?)
   WHERE podcast_guid = ?`;
 
 // The four the collector projects onto an episode (`_episode_upsert_sql`).
 const EPISODE_RECOUNT = `
   UPDATE episodes SET
-    boost_count   = (SELECT COUNT(*)                        FROM boosts WHERE item_guid = ?),
-    total_sats    = (SELECT COALESCE(SUM(sats), 0)          FROM boosts WHERE item_guid = ?),
-    booster_count = (SELECT COUNT(DISTINCT booster_pubkey)  FROM boosts WHERE item_guid = ?),
-    latest_ts     = (SELECT MAX(created_at)                 FROM boosts WHERE item_guid = ?)
+    boost_count   = (SELECT COUNT(DISTINCT event_id)        FROM ${CREDITED} cb WHERE item_guid = ?),
+    total_sats    = (SELECT COALESCE(SUM(sats), 0)          FROM ${CREDITED} cb WHERE item_guid = ?),
+    booster_count = (SELECT COUNT(DISTINCT booster_pubkey)  FROM ${CREDITED} cb WHERE item_guid = ?),
+    latest_ts     = (SELECT MAX(created_at)                 FROM ${CREDITED} cb WHERE item_guid = ?)
   WHERE item_guid = ?`;
 
 // ⚠️ THE ONE TABLE THE EDGE OWNS, created by the edge. Every other table in D1

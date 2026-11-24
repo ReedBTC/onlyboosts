@@ -20,9 +20,10 @@
 //     both have figures no precomputed column can answer, so the aggregates
 //     are the filtered boosts' own: a 1W card's numbers are that week's.
 // All paths return the same record shape; only the corpus differs.
-import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere, creditRecord } from "./_common.js";
 
 import { headOf } from "../../_shared/head.js";
+import { CREDITED, CREDIT_ROW_COLS, CREDIT_ROW_JOINS } from "../../_shared/credited.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // Sort keys are the frontend's own (SORT_OPTIONS in feeds-podcasts.js) so the
@@ -36,7 +37,7 @@ const SORTS = {
   recent:  { col: "e.latest_ts",     agg: "MAX(b.created_at)",               alias: "latest_ts" },
   episode: { col: "e.published",     agg: "e.published",                     alias: "published" },
   count:   { col: "e.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
-  boosts:  { col: "e.boost_count",   agg: "COUNT(*)",                        alias: "boost_count" },
+  boosts:  { col: "e.boost_count",   agg: "COUNT(DISTINCT b.event_id)",      alias: "boost_count" },
   sats:    { col: "e.total_sats",    agg: "COALESCE(SUM(b.sats),0)",         alias: "total_sats" },
   // ⚠️ THE ONLYBOOSTS CHARTS: rank in sats + rank in boosts + rank in
   // boosters, summed, lowest total first — see "The OnlyBoosts Charts" in
@@ -88,6 +89,7 @@ function inlineBoostRecord(r) {
     msg: r.message,
     client: r.client,
     booster: { pk: r.booster_pubkey, npub: r.booster_npub, name: r.pr_name, pic: r.pr_pic },
+    ...(r.credit_role ? { credit: creditRecord(r) } : {}),
   };
 }
 
@@ -113,15 +115,17 @@ async function attachBoosts(env, episodes, followsIn, cutoff = null) {
     const ph = chunk.map(() => "?").join(",");
     return env.DB.prepare(`
       SELECT item_guid, event_id, booster_pubkey, booster_npub, created_at, sats,
-             amount_source, client, message, pr_name, pr_pic
+             amount_source, client, message, pr_name, pr_pic,
+             credit_sats, credit_role, credit_pct, other_sats, other_item, other_guid,
+             other_title, other_show
       FROM (
         SELECT b.item_guid, b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
-               b.sats, b.amount_source, b.client, b.message,
+               ${CREDIT_ROW_COLS}, b.amount_source, b.client, b.message,
                pr.name AS pr_name, pr.picture AS pr_pic,
                ROW_NUMBER() OVER (PARTITION BY b.item_guid
                                   ORDER BY b.created_at DESC, b.event_id DESC) AS rn
-        FROM boosts b
-        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+        FROM ${CREDITED} b
+        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey${CREDIT_ROW_JOINS}
         WHERE b.item_guid IN (${ph})
           ${followsIn ? `AND b.booster_pubkey IN (${followsIn})` : ""}
           ${cutoff ? "AND b.created_at >= ?" : ""}
@@ -460,11 +464,11 @@ async function aggEpisodes(env, p, followsIn) {
     FROM (
       SELECT b.item_guid,
              MIN(b.podcast_guid)                 AS b_podcast_guid,
-             COUNT(*)                            AS boost_count,
+             COUNT(DISTINCT b.event_id)          AS boost_count,
              COALESCE(SUM(b.sats),0)             AS total_sats,
              COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
              MAX(b.created_at)                   AS latest_ts
-      FROM boosts b
+      FROM ${CREDITED} b
       WHERE ${inner.join(" AND ")}
       GROUP BY b.item_guid
     ) g

@@ -111,9 +111,9 @@ exactly one version of one file; that is what closed the `ob-v53` outage (one
 stale module took down all eight feeds). Adding a named export to a shared
 module is ordinary work since then.
 
-**Thirty-three test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
+**Thirty-four test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
 is the per-test reference; **bump the count here and that file together.** Run
-all thirty-three before a merge.
+all thirty-four before a merge.
 
 - **⚠️ `test-server-render.mjs` NEEDS A FRESH CAPTURE** and is the one that goes
   unrun: `curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25' -o <file>`
@@ -316,6 +316,12 @@ Reasoning in `docs/data-pipeline.md`.
   sats by share; the `boosts` row is untouched (`docs/data-pipeline.md`).
 - **The site's own boosts reach D1 at the edge** (`/api/v1/boosts/ingest`); the
   collector stays the source of truth.
+- **⚠️ A BOOST DURING A SONG COUNTS ON THE SONG AND THE HOST**, sats divided by
+  the window's percentage (`boost_credits`, Reed 2026-11-23). A query counting
+  by show, episode, song or artist reads `FROM ${CREDITED} b`
+  (`functions/_shared/credited.js`), counts `COUNT(DISTINCT b.event_id)`, and
+  filters its subject in a WHERE, never a join; a query about a person stays on
+  `boosts`.
 
 ## Detail Pages And Favorites
 

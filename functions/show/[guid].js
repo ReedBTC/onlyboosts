@@ -28,6 +28,7 @@ import {
 // The show's own description, which is the one thing on this page that comes
 // from neither D1 nor the collector. See fetchShowDescription below.
 import { piHeaders, piGet } from "../_shared/podcast-index.js";
+import { CREDITED, CREDIT_ROW_COLS, CREDIT_ROW_JOINS } from "../_shared/credited.js";
 import { parseNotes } from "../_shared/rich-text.js";
 // The stat tiles, each carrying its all-time global rank; /episode shares it.
 import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
@@ -132,7 +133,7 @@ export async function onRequestGet(context) {
        FROM episodes e
        LEFT JOIN (
          SELECT item_guid, COUNT(DISTINCT booster_pubkey) AS boosters
-         FROM boosts WHERE podcast_guid = ? GROUP BY item_guid
+         FROM ${CREDITED} cb WHERE podcast_guid = ? GROUP BY item_guid
        ) x ON x.item_guid = e.item_guid
        WHERE e.podcast_guid = ?
        ORDER BY e.published DESC, e.total_sats DESC, e.item_guid LIMIT 500`
@@ -144,9 +145,9 @@ export async function onRequestGet(context) {
       // supporters swap places between renders.
       `SELECT b.booster_pubkey, b.booster_npub,
               SUM(COALESCE(b.sats, 0)) AS sats,
-              COUNT(*)                 AS boosts,
+              COUNT(DISTINCT b.event_id) AS boosts,
               pr.name, pr.display_name, pr.picture
-       FROM boosts b
+       FROM ${CREDITED} b
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE b.podcast_guid = ?
        GROUP BY b.booster_pubkey
@@ -154,13 +155,14 @@ export async function onRequestGet(context) {
        LIMIT 500`
     ).bind(guid).all(),
     env.DB.prepare(
-      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
+              ${CREDIT_ROW_COLS},
               b.item_guid, b.message, b.client_id,
               e.title AS e_title, e.episode_number AS e_num,
               pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
-       FROM boosts b
+       FROM ${CREDITED} b
        LEFT JOIN episodes e ON e.item_guid = b.item_guid
-       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey${CREDIT_ROW_JOINS}
        WHERE b.podcast_guid = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(guid, BOOSTS_SHOWN).all(),
@@ -208,9 +210,15 @@ export async function onRequestGet(context) {
     // to link to (see the qualifying rule above), and an unlinkable card in a
     // discovery list is dead weight. That is a deliberate divergence from the
     // Shows feed, which keeps them as "Unidentified show".
+    //
+    // The COMMUNITY is read through the credited rows (a booster of a song
+    // played on this show is in this show's audience), but the rollup over
+    // the other shows stays on `boosts`: joined on the booster, a UNION ALL
+    // cannot use idx_boosts_booster and would read every boost in D1 per page
+    // view. Those other shows' figures are a discovery hint, not a total.
     env.DB.prepare(
       `WITH community AS (
-         SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
+         SELECT DISTINCT booster_pubkey FROM ${CREDITED} cb WHERE podcast_guid = ?
        )
        SELECT b.podcast_guid, p.title, p.image, p.artwork, p.feed_url, p.medium,
               COUNT(*)                         AS cs_boosts,
@@ -541,20 +549,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v294" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v294" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -979,12 +987,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v293" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v293" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v294" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v294" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v293"></script>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v294"></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
 }
@@ -1544,10 +1552,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v293" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v293" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v294" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v294" />
 </head>
 <body>
 <section class="page-header">
@@ -1566,7 +1574,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v293" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v294" defer></script>
 </body>
 </html>`;
   return new Response(html, {

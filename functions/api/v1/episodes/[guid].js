@@ -20,7 +20,8 @@
 //      fan-out runs to a median of 248 rows, a p90 of 1,171 and a maximum of
 //      3,368 — so the cap below bites on 1.6% of episodes, and the caller is
 //      told when it did.
-import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { json, preflight, BOOST_SELECT, CREDITED_BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { CREDITED } from "../../../_shared/credited.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 import { headOf } from "../../../_shared/head.js";
@@ -69,7 +70,7 @@ export async function onRequestGet({ request, env, params }) {
 
   const limit = clampLimit(u.searchParams.get("limit"), BOOSTS_CAP, BOOSTS_CAP);
   const boosts = await env.DB.prepare(
-    `${BOOST_SELECT} WHERE b.item_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+    `${CREDITED_BOOST_SELECT} WHERE b.item_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
   ).bind(guid, limit).all();
 
   const body = {
@@ -203,7 +204,7 @@ export async function fetchCommunityBoosts(env, guid, showGuid, medium) {
     : " AND COALESCE(p.medium, 'podcast') <> 'music'";
   const { results } = await env.DB.prepare(
     `WITH community AS (
-       SELECT DISTINCT booster_pubkey FROM boosts WHERE item_guid = ?
+       SELECT DISTINCT booster_pubkey FROM ${CREDITED} cb WHERE item_guid = ?
      )
      ${BOOST_SELECT}
      JOIN community c ON c.booster_pubkey = b.booster_pubkey
