@@ -1891,7 +1891,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                 <button onClick={handleBoost}
                   className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-sm font-medium text-white transition-colors">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd"/></svg>
-                  Boost episode
+                  {episode?.song ? 'Boost song' : 'Boost episode'}
                 </button>
                 {/* Said before the press rather than only after it, because
                     the wallet gate now sits behind this button: a reader who

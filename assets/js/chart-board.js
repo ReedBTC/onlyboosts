@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v310';
-import { httpsUrl } from './cover-art.js?v=ob-v310';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v310';
-import { boosterPageHref } from './booster-link.js?v=ob-v310';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v310';
-import { weekDateString } from './pacific-week.js?v=ob-v310';
-import { initials } from './hpw-board.js?v=ob-v310';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v311';
+import { httpsUrl } from './cover-art.js?v=ob-v311';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v311';
+import { boosterPageHref } from './booster-link.js?v=ob-v311';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v311';
+import { weekDateString } from './pacific-week.js?v=ob-v311';
+import { initials } from './hpw-board.js?v=ob-v311';
 
 const esc = htmlEscape;
 
