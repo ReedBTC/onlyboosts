@@ -65,7 +65,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.obp button {
+.obp-controls button {
   flex: none;
   font: inherit;
   color: var(--ink);
@@ -74,7 +74,7 @@
   border-radius: 999px;
   cursor: pointer;
 }
-.obp button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.obp-controls button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* A filled brand button is --brand-dd: --brand on white fails AA. */
 .obp .obp-play {
   width: 2.6rem; height: 2.6rem;
@@ -88,8 +88,8 @@
 }
 .obp .obp-chap { display: inline-flex; align-items: center; justify-content: center; }
 .obp .obp-chap[hidden] { display: none; }
-.obp button:disabled { opacity: 0.4; cursor: default; }
-.obp button:hover:not(:disabled) { border-color: var(--brand); }
+.obp-controls button:disabled { opacity: 0.4; cursor: default; }
+.obp-controls button:hover:not(:disabled) { border-color: var(--brand); }
 .obp-main { min-width: 0; }
 /* The buttons under the line: play and its four skips centred, the speed at
    the right edge. The empty first column balances the speed so the centre is
@@ -105,7 +105,7 @@
   min-height: 1.6rem;
 }
 .obp-now-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.obp-now-heart { flex: none; }
+.obp-now-heart { flex: none; display: flex; align-items: center; gap: 0.4rem; }
 
 .obp-track {
   position: relative;
@@ -176,7 +176,13 @@ html.obp-docked body { padding-bottom: 8.5rem; }
    song's heart. */
 .ep-song { display: flex; align-items: center; }
 .ep-song .ep-chapter-btn { flex: 1; min-width: 0; }
-.ep-song > [data-fav] { flex: none; margin-right: 0.75rem; }
+.ep-song-verbs {
+  flex: none; display: flex; align-items: center; gap: 0.4rem; margin-right: 0.75rem;
+}
+/* The site's boost pill beside a song's heart, in the list and on the
+   player's now-playing line: the row's gap spaces them, not the pill's own
+   right-aligning margin. */
+.ep-song-verbs .ob-boost-pill, .obp-now-heart .ob-boost-pill { margin-left: 0; }
 .ep-chapter-sub { color: var(--muted); }
 
 /* ── The player card, and the two drawers inside it ───────────────────── */

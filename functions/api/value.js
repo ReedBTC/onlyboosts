@@ -163,6 +163,63 @@ function valueFromXml(frag) {
   return normalizeValue({ model, destinations });
 }
 
+// ---------------------------------------------------------------------------
+// The song playing at a moment of the episode (Part 4, 2026-11-24).
+//
+// A music show tags each song with a <podcast:valueTimeSplit startTime
+// duration remotePercentage> holding a <podcast:remoteItem feedGuid
+// itemGuid>, nested in the item's value block. A boost made during the window
+// pays remotePercentage of the amount to the song's own value block and the
+// rest to this block (the spec, and Boost Me Bitch). The caller passes `at`,
+// the seconds into the episode when the Boost button was pressed; this answers
+// with the window covering it.
+//
+// ⚠️ READ HERE, ON THE MONEY PATH, FROM THE FEED JUST FETCHED. The player's
+// list of songs (/api/episode-songs) is cached for an hour and reads the same
+// tags; it labels the screen and never decides a payment. The percentage paid
+// is the one the feed states now.
+//
+// Only a window naming a song (a remoteItem) is returned; a window of inline
+// recipients is left out, as it always has been here (Reed, 2026-11-23: v1
+// pays songs). Half-open, and the latest start wins an overlap, which is the
+// player's rule too. A percentage outside 0..100 is no window at all, and so
+// is 0: nothing would go to the song.
+//
+// ⚠️ `want` IS THE SONG THE READER CHOSE (a song's own Boost button, Reed
+// 2026-11-25), and only a window naming that item can answer. The button sends
+// the window's start as `at` and the song's item guid as `song`; a feed edited
+// since the page loaded (the song moved or gone) answers no window, and the
+// page says so rather than paying whatever now sits at that second.
+export function timeSplitAt(itemXml, at, want = null) {
+  const t = Number(at);
+  if (!itemXml || !Number.isFinite(t) || t <= 0) return null;
+  const el = firstValueElement(itemXml);
+  if (!el) return null;
+  const re = new RegExp(`<${NS}valueTimeSplit(?=[\\s>/])([^>]*?)(?:/>|>([\\s\\S]*?)</${NS}valueTimeSplit\\s*>)`, "gi");
+  let m, hit = null;
+  while ((m = re.exec(el.inner))) {
+    const a = parseAttrs(m[1]);
+    const start = Number(a.startTime), duration = Number(a.duration);
+    if (!Number.isFinite(start) || !Number.isFinite(duration) || start < 0 || duration <= 0) continue;
+    if (!(t >= start && t < start + duration)) continue;
+    const ri = new RegExp(`<${NS}remoteItem(?=[\\s>/])([^>]*)>`, "i").exec(m[2] || "");
+    if (!ri) continue;
+    const r = parseAttrs(ri[1]);
+    const feedGuid = (r.feedGuid || "").trim(), itemGuid = (r.itemGuid || "").trim();
+    if (!feedGuid || !itemGuid || feedGuid.length > 400 || itemGuid.length > 400) continue;
+    if (want && itemGuid !== want) continue;
+    const rawPct = a.remotePercentage;
+    const pct = rawPct == null || String(rawPct).trim() === "" ? 100 : Number(rawPct);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) continue;
+    if (hit && hit.start > start) continue;
+    hit = {
+      start, duration, pct, feedGuid, itemGuid,
+      feedUrl: /^https?:\/\//i.test(r.feedUrl || "") ? r.feedUrl : null,
+    };
+  }
+  return hit;
+}
+
 // The channel's own markup: the document with every <item> and <liveItem>
 // cut out. Not "everything before the first item": Sovereign Feeds writes a
 // liveItem ABOVE the channel block, and a channel block after the last item is
@@ -179,8 +236,8 @@ function channelXml(xml) {
 //   { channel: value|null, item: value|null, itemFound: bool, truncated: bool }
 // An item whose closing tag never arrived (the cap) is not found; the caller
 // reads `truncated` to tell "not published" from "not read".
-export function readRssValue(xml, itemGuid, truncated = false) {
-  const out = { channel: null, item: null, itemFound: false, truncated };
+export function readRssValue(xml, itemGuid, truncated = false, at = null, song = null) {
+  const out = { channel: null, item: null, itemFound: false, truncated, timeSplit: null };
   if (!/<channel(?=[\s>])/i.test(xml)) return null;      // not RSS at all
   if (itemGuid) {
     const want = String(itemGuid).trim();
@@ -192,6 +249,7 @@ export function readRssValue(xml, itemGuid, truncated = false) {
       if (decodeEntities(stripCdata(g[1])).trim() !== want) continue;
       out.itemFound = true;
       out.item = valueFromXml(m[0]);
+      if (at != null) out.timeSplit = timeSplitAt(m[0], at, song);
       break;
     }
   }
@@ -201,7 +259,7 @@ export function readRssValue(xml, itemGuid, truncated = false) {
 
 // Fetch the feed, bounded three ways. Null when it cannot be read as RSS;
 // otherwise readRssValue's answer, with `truncated` set if the cap cut it.
-async function fetchRssValue(feedUrl, itemGuid) {
+async function fetchRssValue(feedUrl, itemGuid, at = null, song = null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), RSS_TIMEOUT_MS);
   try {
@@ -230,7 +288,7 @@ async function fetchRssValue(feedUrl, itemGuid) {
       for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
       text = new TextDecoder("utf-8").decode(buf.subarray(0, RSS_MAX_BYTES));
     }
-    return readRssValue(text, itemGuid, truncated);
+    return readRssValue(text, itemGuid, truncated, at, song);
   } catch {
     return null;
   } finally {
@@ -290,6 +348,12 @@ export async function onRequest(context) {
   // edge cache.
   const feedUrl = params.get("feedUrl");
   const podcastGuid = params.get("podcastGuid");
+  // Seconds into the episode when Boost was pressed; see timeSplitAt.
+  const atRaw = params.get("at");
+  const at = atRaw != null && /^\d{1,6}(\.\d{1,3})?$/.test(atRaw) ? Number(atRaw) : null;
+  // The song a song's Boost button names; see timeSplitAt.
+  const songRaw = (params.get("song") || "").trim();
+  const songGuid = songRaw && songRaw.length <= 400 ? songRaw : null;
 
   if (!feedId && !feedUrl && !podcastGuid) {
     return new Response(JSON.stringify({ error: "feedId, feedUrl or podcastGuid required" }), {
@@ -352,15 +416,19 @@ export async function onRequest(context) {
   // names — the same record the fallback below would read, so nothing is
   // worse than the old path.
   let rss = null;
-  if (rssUrl) rss = await fetchRssValue(rssUrl, guid);
+  if (rssUrl) rss = await fetchRssValue(rssUrl, guid, at, songGuid);
   else {
     const rec = await resolvePi();
     let u = null;
     try { const p = new URL(rec?.url || ""); if ((p.protocol === "http:" || p.protocol === "https:") && !p.username && !p.password) u = rec.url; } catch {}
-    if (u) rss = await fetchRssValue(u, guid);
+    if (u) rss = await fetchRssValue(u, guid, at, songGuid);
   }
   if (rss) {
-    if (guid && rss.item) return json({ level: "episode", source: "rss", value: rss.item });
+    // The window rides only the item's own block: it is nested in it, and a
+    // boost that fell back to the channel's block has no window to honour.
+    if (guid && rss.item) {
+      return json({ level: "episode", source: "rss", value: rss.item, ...(rss.timeSplit ? { timeSplit: rss.timeSplit } : {}) });
+    }
     if (guid && !rss.itemFound && rss.truncated) {
       // The item may sit past the cap. PI's record of it is the next best
       // reading; the channel block is still the feed's own answer after that.

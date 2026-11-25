@@ -163,3 +163,40 @@ export function applyExternalOverrides(recipients) {
   if (!Array.isArray(recipients)) return recipients
   return recipients.map((r) => ({ ...r }))
 }
+
+/**
+ * One boost made during a song: the song's value block at the window's
+ * percentage, the show's at the rest, as one list of splits paid in one press
+ * (the podcast namespace's valueTimeSplit; Boost Me Bitch pays it the same way).
+ *
+ * Each block keeps its own proportions: a song leg's weight is its share of
+ * the song's block times `pct`, a show leg's its share of the show's block
+ * times (100 − pct). So the weights sum to 100 and `distributeSats` divides
+ * the typed amount exactly as the two blocks would separately.
+ *
+ * ⚠️ NO LEG IS DROPPED, RENAMED OR MERGED, from either block. A show leg left
+ * with no weight (a window at 100%) stays in the list at zero and is skipped
+ * when paid, which is how a zero leg has always been handled. Song legs carry
+ * `group: 'track'`, which is what the boost screen marks them by and what
+ * decides whether the note names the song; it changes nothing about payment.
+ *
+ * @param {{recipients:Array, totalWeight:number}} host  the episode's block
+ * @param {{recipients:Array, totalWeight:number}} song  the song's block
+ * @param {number} pct  the window's remotePercentage, 0 < pct ≤ 100
+ * @returns {{recipients:Array, totalWeight:number}|null} null when either block
+ *   or the percentage is unusable, and the caller pays the show alone
+ */
+export function combineTimeSplit(host, song, pct) {
+  const p = Number(pct)
+  if (!Number.isFinite(p) || p <= 0 || p > 100) return null
+  const hw = Number(host?.totalWeight), sw = Number(song?.totalWeight)
+  if (!Array.isArray(host?.recipients) || !host.recipients.length || !(hw > 0)) return null
+  if (!Array.isArray(song?.recipients) || !song.recipients.length || !(sw > 0)) return null
+  const recipients = [
+    ...song.recipients.map((r) => ({ ...r, group: 'track', splitWeight: (r.splitWeight / sw) * p })),
+    ...host.recipients.map((r) => ({ ...r, group: 'host', splitWeight: (r.splitWeight / hw) * (100 - p) })),
+  ]
+  const totalWeight = recipients.reduce((a, r) => a + r.splitWeight, 0)
+  if (!(totalWeight > 0)) return null
+  return { recipients, totalWeight }
+}

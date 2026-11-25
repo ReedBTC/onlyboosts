@@ -1472,6 +1472,55 @@ own data attributes and are threaded through `resolveValue` *and* `openBoost`
 together — passing a guid to one and not the other would resolve one show's
 splits and label the published note with another's.
 
+### A Song Is Boosted From Its Own Button
+
+Built 2026-11-24, redesigned 2026-11-25 at Reed's request. On `/episode`, each
+song row in the chapters list and the player's now-playing line carry a Boost
+button for that song (`episode-page.js#songBoostNode`). It pays the song as if
+boosted while it played, playing or not: the song's value block at its
+`<podcast:valueTimeSplit>` percentage and the show's at the rest, one press.
+
+- **⚠️ "BOOST THIS EPISODE" PAYS THE EPISODE ALONE AND NEVER READS THE PLAYER.**
+  The first build paid whatever song was on when the hero button was pressed,
+  as Boost Me Bitch does; Reed: the button says episode, he usually wants to
+  boost the show for playing him the music, and racing the end of a track to
+  boost it is the part of BMB he would not copy.
+- **⚠️ THE FEED HAS THE LAST WORD ON THE SONG AND ITS SHARE.** The page knows the
+  song from `/api/episode-songs` (cached an hour; labels only). The button asks
+  `/api/value?at=<a second inside the window>&song=<item guid>`, which reads the
+  window from the feed it has just fetched and answers only with one naming
+  that song (`timeSplitAt`'s `want`). A feed edited since the page loaded is
+  refused with a message, never paid as whatever now sits at that second. A
+  song with no payable block is refused too; the episode stays boostable.
+- **⚠️ ONE PAYMENT, TWO BLOCKS, NO LEG DROPPED** (`value-block.js#combineTimeSplit`).
+  The song's block at `remotePercentage`, the show's at the rest, each in its
+  own proportions, so the weights sum to 100 and `distributeSats` divides the
+  typed amount exactly. A show leg at 0% stays in the list and is skipped. The
+  song's legs carry `group: 'track'`, which the screen marks with ♪ and which
+  decides the note; it changes nothing about how a leg is paid, retried,
+  checked or offered by QR.
+- **The screen leads with the song**: "⚡ Boost song", the song and artist, the
+  episode it was heard on, and the division.
+- **Every split's boostagram carries the moment**: `ts` (the player's position
+  if it is inside the song, otherwise the song's start) and bLIP-10's
+  `remote_feed_guid` / `remote_item_guid`, on the song's splits and the show's
+  alike. `value_msat_total` is the typed amount on every split, as always. The
+  BoostBox descriptor is unchanged.
+- **⚠️ THE NOTE NAMES THE SONG ONLY IF A SONG SPLIT LANDED** (paid, or
+  unconfirmed and counted), from live leg state; the pre-signed note carries it
+  when the plan pays the song, and is only published when everything paid. The
+  host pair comes first and the song pair last, two items and never a third:
+  Boost Me Bitch's shape, which the collector's `split_credit` credits by
+  finding one item in the other's time splits. Last pair wins in both the
+  collector and the edge ingest, so the boosts row is the song's and the show's
+  share is its `boost_credits` row, written by the collector's next tick, never
+  at the edge (OB-back, 2026-11-24). Reed's first real boost, 2026-11-24, 123
+  sats during "Keep On Playin'" at 90%, was credited 111 / 12 within minutes.
+- **The Boost buttons show to everyone** (a wallet, not an account) and resolve
+  on the press, since an episode can carry thirty songs.
+- **Not in v1**: a window of inline recipients (a guest's share) is not paid,
+  as it never was here; the summary receipt names the show alone.
+
 ### The Boost Is Indexed At The Edge Before The Collector Sees It
 
 *Shipped 2026-09-06, Reed's ask.* Every number on this site comes out of D1,

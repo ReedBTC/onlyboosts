@@ -134,6 +134,7 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   let chapters = []
   let songs = []
   let songHeart = () => null       // song → Node | null, set by the page
+  let songBoost = () => null       // the song's Boost button, likewise
   const listeners = new Set()
 
   // The slot keeps the bar's height on the page while the bar is docked, so
@@ -233,8 +234,14 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
     nowHeart.replaceChildren()
     if (song) {
       nowText.textContent = '♪ ' + (song.title || 'A song') + (song.artist ? ' - ' + song.artist : '')
+      // The song's verbs ride the line that names it: Favorite, and Boost,
+      // which boosts this song (not the episode) and stays at hand while the
+      // bar is docked (Reed, 2026-11-25). Built per song, so a press always
+      // boosts the song the line showed when it was pressed.
       const h = songHeart(song)
       if (h) nowHeart.appendChild(h)
+      const b = songBoost(song)
+      if (b) nowHeart.appendChild(b)
     } else if (chap) {
       nowText.textContent = chap.title
     } else {
@@ -370,9 +377,10 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
       lastKey = ''
       paintMarkers(); paintTime()
     },
-    setSongs(list, { heart } = {}) {
+    setSongs(list, { heart, boost } = {}) {
       songs = (Array.isArray(list) ? list : []).filter((s) => Number(s.duration) > 0)
       if (typeof heart === 'function') songHeart = heart
+      if (typeof boost === 'function') songBoost = boost
       lastKey = ''
       paintMarkers(); paintTime()
     },

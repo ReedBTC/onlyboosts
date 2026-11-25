@@ -98,6 +98,13 @@ const RECHECK_MS = 30_000
 const QR_WATCH_MS = 600_000
 const QR_POLL_MS = 5000
 
+// A window's percentage as the feed states it: whole numbers plain, anything
+// finer to one place.
+function fmtPct(p) {
+  const n = Math.max(0, Math.min(100, Number(p) || 0))
+  return `${Number.isInteger(n) ? n : n.toFixed(1)}%`
+}
+
 function fmtSats(n) { return Number(n || 0).toLocaleString() }
 
 /**
@@ -413,7 +420,9 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked, onQr, qrBu
       <div className="flex items-center gap-2.5">
         <span className="w-4 flex justify-center shrink-0">{icon}</span>
         <span className={`flex-1 min-w-0 truncate ${idle ? 'text-[var(--muted,#5a7488)]' : 'text-[var(--ink,#0f2733)] font-medium'}`}>
-          {recipient?.name || recipient?.address || 'Recipient'}
+          {/* A split of the song playing when Boost was pressed, rather than
+              of the show (value-block.js#combineTimeSplit). */}
+          {recipient?.group === 'track' ? '♪ ' : ''}{recipient?.name || recipient?.address || 'Recipient'}
         </span>
         {sats != null && (
           <span className={`shrink-0 tabular-nums ${status === STATUS.PAID ? 'text-[var(--ink,#0f2733)] font-semibold' : 'text-[var(--muted,#5a7488)]'}`}>
@@ -478,6 +487,15 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
 
   const recipients = recipientsBundle?.recipients || []
   const totalWeight = recipientsBundle?.totalWeight || 0
+  // What every split's boostagram says about the moment of the press: the
+  // seconds into the episode, and the song then playing (bLIP-10's ts and
+  // remote_* fields). The same on a first payment, a Retry and a QR invoice,
+  // since all three are the one boost.
+  const songMeta = donation ? {} : {
+    ts: Number.isFinite(episode?.ts) ? episode.ts : null,
+    remoteFeedGuid: episode?.song?.feedGuid || null,
+    remoteItemGuid: episode?.song?.itemGuid || null,
+  }
   const hasValue = recipients.length > 0 && totalWeight > 0
 
   const [amount, setAmount] = useState('')
@@ -786,6 +804,14 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // Read off the rule's answer rather than restated, so the rows and the
   // note cannot disagree about whether an unconfirmed split counts.
   const unconfirmedCounted = landedCount > paidCount
+  // ⚠️ THE NOTE NAMES THE SONG ONLY IF ONE OF ITS SPLITS LANDED, read from
+  // live leg state like every other figure here (BMB's rule). `episode.song`
+  // is the song that was on when Boost was pressed (episode-page.js); its
+  // splits are the ones marked `group: 'track'`. A song whose splits all
+  // failed leaves a note about the show alone, which is what was paid.
+  const songLanded = !donation && !!episode?.song && recipients.some((r, i) =>
+    r?.group === 'track' && (legs[i]?.status === STATUS.PAID ||
+      (unconfirmedCounted && legs[i]?.status === STATUS.UNCERTAIN)))
 
   /**
    * ⚠️ DECLARED ABOVE ITS FIRST READ, AND THAT IS THE WHOLE POINT OF WHERE IT
@@ -1052,6 +1078,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         podcastGuid: episode?.podcastGuid,
         itemGuid: episode?.itemGuid,
         bmbUrl: episode?.bmbUrl,
+        song: songLanded ? episode.song : null,
       })
       // The only difference between the two routes is where the signature
       // comes from. Both produce a signed event and both publish it from the
@@ -1264,8 +1291,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   async function presignNote(sats) {
     presignedRef.current = null
     if (noteRoute !== 'donor') return
-    const projected = distributeSats(sats, recipients, totalWeight).filter((l) => l.sats > 0).length
+    const plan = distributeSats(sats, recipients, totalWeight)
+    const projected = plan.filter((l) => l.sats > 0).length
     if (projected === 0) return
+    // Signed in advance for the case where every split pays, so the song is
+    // in it exactly when the song has a split to pay.
+    const songProjected = !!episode?.song && plan.some((l) => l.sats > 0 && l.recipient?.group === 'track')
     try {
       // The receipt for the typed amount, signed now (a second prompt, before
       // the note's) and held unpublished until the pre-signed note is about to
@@ -1291,6 +1322,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         podcastGuid: episode?.podcastGuid,
         itemGuid: episode?.itemGuid,
         bmbUrl: episode?.bmbUrl,
+        song: songProjected ? episode.song : null,
       })
       const signed = await signKindOneShareWithUser(template)
       if (cancelledRef.current) return
@@ -1333,6 +1365,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           itemGuid: episode?.itemGuid,
           feedUrl: episode?.feedUrl,
           boostLink: episode?.bmbUrl,
+          ...songMeta,
         },
         // ⚠️ A DONATION SKIPS THE BOOSTBOX DESCRIPTOR. That descriptor exists so
         // a PODCASTER's Helipad can resolve who boosted them and for what; on a
@@ -1404,6 +1437,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         meta: {
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, feedUrl: episode?.feedUrl, boostLink: episode?.bmbUrl,
+          ...songMeta,
         },
         donation,
         // A leg that failed at the LNURL step has a null cache entry, so a
@@ -1501,6 +1535,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         meta: {
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, feedUrl: episode?.feedUrl, boostLink: episode?.bmbUrl,
+          ...songMeta,
         },
         donation,
         lnurlCache,
@@ -1551,7 +1586,9 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         noteHint: 'Posts a note saying you donated to OnlyBoosts. It carries no podcast tags, so it does not appear in the boost feeds.',
       }
     : {
-        header: '⚡ Boost episode',
+        // A song's own Boost button (the chapters list, the player bar) opens
+        // this screen with `episode.song`; the screen is then about the song.
+        header: episode?.song ? '⚡ Boost song' : '⚡ Boost episode',
         subject: episode?.showTitle || '',
         subjectNote: '',
         noteHint: '',
@@ -1630,7 +1667,21 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           </div>
 
           <div inert={pickingGif ? '' : undefined} className="px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
-            {copy.subject && (
+            {/* A song's boost names the song first, then the episode it was
+                heard on, then how the feed divides it (Reed, 2026-11-25: the
+                screen should say plainly which one is being boosted). */}
+            {!donation && episode?.song && (
+              <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
+                <span className="font-semibold text-[var(--ink,#0f2733)]">
+                  ♪ {episode.song.title || 'This song'}{episode.song.artist ? ` - ${episode.song.artist}` : ''}
+                </span>
+                <span className="block mt-0.5">
+                  on {episode?.episodeTitle ? <span className="italic">"{episode.episodeTitle}"</span> : 'this episode'}{copy.subject ? ` (${copy.subject})` : ''}
+                </span>
+                <span className="block mt-0.5">{fmtPct(episode.song.pct)} to the song, {fmtPct(100 - episode.song.pct)} to the show</span>
+              </div>
+            )}
+            {copy.subject && !(!donation && episode?.song) && (
               <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
                 <span className="font-semibold text-[var(--ink,#0f2733)]">{copy.subject}</span>
                 {!donation && episode?.episodeTitle && <span className="block italic mt-0.5">"{episode.episodeTitle}"</span>}
@@ -1840,7 +1891,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                 <button onClick={handleBoost}
                   className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-sm font-medium text-white transition-colors">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd"/></svg>
-                  Boost episode
+                  {episode?.song ? 'Boost song' : 'Boost episode'}
                 </button>
                 {/* Said before the press rather than only after it, because
                     the wallet gate now sits behind this button: a reader who

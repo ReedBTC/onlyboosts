@@ -22,22 +22,23 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v307'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v307'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v307'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v307'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v307'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v312'
+import { fromApiValue, applyExternalOverrides, combineTimeSplit } from '/assets/js/value-block.js?v=ob-v312'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v312'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v312'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v312'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v307'
+} from '/assets/js/detail-page.js?v=ob-v312'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v307'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v307'
-import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v307'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v307'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v312'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v312'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v312'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v312'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v312'
 
 const VALUE_API = '/api/value'
 
@@ -88,12 +89,14 @@ initArt2('.show-art img[data-art2]', 'div', 'show-art-blank')
  * /api/value falls back to the feed-level block server-side when an episode has
  * none of its own, which is what makes an episode of a boostable show boostable.
  */
-async function resolveValue(target, itemGuid) {
+async function resolveValue(target, itemGuid, { at = null, song = null } = {}) {
   if (!target) return null
   const qs = new URLSearchParams()
   if (target.guid) qs.set('podcastGuid', target.guid)
   if (target.feed) qs.set('feedUrl', target.feed)
   if (itemGuid) qs.set('guid', itemGuid)
+  if (at != null) qs.set('at', String(at))
+  if (song) qs.set('song', song)
   if (![...qs.keys()].length) return null
 
   let data = null
@@ -113,10 +116,81 @@ async function resolveValue(target, itemGuid) {
   const recipients = applyExternalOverrides(parsed.recipients)
   const totalWeight = recipients.reduce((a, r) => a + (r.splitWeight || 0), 0)
   if (!recipients.length || totalWeight <= 0) return null
-  return { recipients, totalWeight }
+  return { recipients, totalWeight, timeSplit: data?.timeSplit || null }
 }
 
-async function openBoost(bundle, { target, itemGuid, episodeTitle }) {
+/* A SONG'S OWN BOOST (Reed, 2026-11-25). Each song row in the chapters list
+ * and the player bar's now-playing line carry a Boost button for that song; it
+ * pays the song as if boosted while it played, whether or not anything is
+ * playing: the song's value block at its window's percentage, the show's at
+ * the rest, one press. The hero's "Boost this Episode" pays the episode alone
+ * and never looks at the player: a reader boosting the show for playing them
+ * the music should not have to race the end of a track to do it.
+ *
+ * ⚠️ THE FEED HAS THE LAST WORD ON THE SONG AND ITS SHARE. The page knows the
+ * song from /api/episode-songs (cached an hour, labels only); /api/value reads
+ * the feed now and answers only with a window naming that same song
+ * (`song=` + `at=` inside its window). A song the feed no longer places there
+ * is refused with a message, never paid as whatever sits at that second now.
+ *
+ * Returns { bundle, song, ts } or { message } to show the reader. */
+async function resolveSongBoost(s) {
+  const start = Math.max(0, Number(s?.start) || 0)
+  const duration = Math.max(0, Number(s?.duration) || 0)
+  if (!s?.itemGuid || !s?.feedGuid || !(duration > 0)) return { message: 'This song can’t be boosted.' }
+  // A second inside the window, clear of its first instant: the edge treats
+  // position zero as nothing playing.
+  const probe = Math.round((start + Math.min(1, duration / 2)) * 1000) / 1000
+  const host = await resolveValue(EPISODE, EPISODE.itemGuid, { at: probe, song: s.itemGuid })
+  if (!host) return { message: 'This episode has no value block to boost.' }
+  if (host.error) return { message: 'Couldn’t load boost splits — please try again in a moment.' }
+  const ws = host.timeSplit
+  if (!ws || ws.itemGuid !== s.itemGuid) {
+    return { message: 'The show’s feed no longer lists this song here. Reload the page and try again.' }
+  }
+  const songBundle = await resolveValue({ guid: ws.feedGuid, feed: ws.feedUrl || null }, ws.itemGuid)
+  if (songBundle?.error) return { message: 'Couldn’t load this song’s splits — please try again in a moment.' }
+  const combined = songBundle ? combineTimeSplit(host, songBundle, ws.pct) : null
+  if (!combined) return { message: 'This song has no value block, so it can’t be boosted. You can still boost the episode.' }
+  // The boostagram's `ts`: where the player is, if it is inside this song;
+  // otherwise the song's start, the moment the boost stands for.
+  const st = window.LBPlayer?.state?.()
+  const inside = st?.started && st.itemGuid === EPISODE.itemGuid &&
+    st.positionSec >= start && st.positionSec < start + duration
+  const ts = Math.floor(inside ? st.positionSec : start)
+  const song = {
+    feedGuid: ws.feedGuid, itemGuid: ws.itemGuid, pct: ws.pct,
+    title: s.title || '', artist: s.artist || '',
+  }
+  return { bundle: combined, song, ts }
+}
+
+async function boostSong(s) {
+  try {
+    const r = await resolveSongBoost(s)
+    if (r.message) { showToast(r.message, true); return }
+    await openBoost(r.bundle, {
+      target: EPISODE,
+      itemGuid: EPISODE.itemGuid,
+      episodeTitle: EPISODE.episodeTitle,
+      song: r.song, ts: r.ts,
+    })
+  } catch (err) {
+    console.warn('[episode] song boost failed', err)
+    showToast('Couldn’t start the boost — try again.', true)
+  }
+}
+
+/* The Boost button for one song, the site's one boost pill (boost-button.js).
+ * Shown to everyone: boosting needs a wallet, not an account. It resolves on
+ * the press, not on load, since an episode can carry thirty songs. */
+function songBoostNode(s) {
+  if (!EPISODE || (!EPISODE.guid && !EPISODE.feed) || !s?.itemGuid || !s?.feedGuid) return null
+  const label = s.title ? `${s.title}${s.artist ? ` by ${s.artist}` : ''}` : 'this song'
+  return boostButton({ label, onClick: (btn) => withBoostBusy(btn, () => boostSong(s)) })
+}
+
+async function openBoost(bundle, { target, itemGuid, episodeTitle, song = null, ts = null }) {
   await ensureLoginWidget()
   if (!window.LBLogin?.openExternalBoost) {
     showToast('Boost is unavailable right now.', true)
@@ -148,6 +222,10 @@ async function openBoost(bundle, { target, itemGuid, episodeTitle }) {
         feedId: null,
       }) || '',
       feedUrl: target?.feed || '',   // the boostagram's `url` (bLIP-10)
+      // The song on when Boost was pressed, and the seconds into the episode.
+      // Absent, the boost is the show's alone, exactly as before.
+      ...(song ? { song } : {}),
+      ...(ts != null ? { ts } : {}),
     },
     recipientsBundle: bundle,
   })
@@ -179,6 +257,8 @@ async function initBoosting() {
     btn.disabled = true
     btn.textContent = 'Loading…'
     try {
+      // The episode alone, whatever is playing (Reed, 2026-11-25). A song is
+      // boosted from its own button; see resolveSongBoost.
       const bundle = await resolveValue(EPISODE, EPISODE.itemGuid)
       if (!bundle) { showToast('This episode has no value block to boost.', true); return }
       if (bundle.error) { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
@@ -338,7 +418,7 @@ function paintContents(chapters, songs) {
   const sgs = Array.isArray(songs) ? songs.filter((s) => Number(s.duration) > 0) : []
   if (player) {
     player.setChapters(chs)
-    player.setSongs(sgs, { heart: songHeartNode })
+    player.setSongs(sgs, { heart: songHeartNode, boost: songBoostNode })
   }
   // Nothing to show is the ordinary outcome, not a failure: the drawer stays
   // hidden and the page is the page it was before.
@@ -367,8 +447,14 @@ function paintContents(chapters, songs) {
       const who = r.s.artist || ''
       const btn = rowButton(r.start, '♪ ' + (r.s.title || 'A song'), who)
       li.appendChild(btn)
+      // The song's two verbs, beside its row: Favorite (signed in) and Boost.
+      const verbs = document.createElement('span')
+      verbs.className = 'ep-song-verbs'
       const heart = songHeartNode(r.s)
-      if (heart) li.appendChild(heart)
+      if (heart) verbs.appendChild(heart)
+      const boost = songBoostNode(r.s)
+      if (boost) verbs.appendChild(boost)
+      if (verbs.childNodes.length) li.appendChild(verbs)
       songBtns.set(r.s, btn)
     }
     frag.appendChild(li)

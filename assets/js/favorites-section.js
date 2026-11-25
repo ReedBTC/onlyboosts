@@ -30,11 +30,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v307'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v307'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v307'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v307'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v307'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v312'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v312'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v312'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v312'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v312'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 

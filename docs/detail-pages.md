@@ -483,10 +483,12 @@ previous chapter, back 15, play, forward 30, next chapter, and the speed.
   when it comes back. It does not survive a navigation: every link is a full
   page load, and a site-wide player is a navigation change (Reed, 2026-11-23,
   "maybe someday"), which is why the module owns the audio.
-- **`window.LBPlayer.state()`** is the read side for the boost button:
-  `{ itemGuid, positionSec, playing, started, song, chapter }`. `started` is a
-  position past zero, never zero, so a window authored at 0 cannot claim a
-  boost pressed before anyone pressed play.
+- **Each song row, and the now-playing line, carry the song's Boost button**
+  beside its heart; it boosts that song, not the episode (`docs/money-paths.md`,
+  *A Song Is Boosted From Its Own Button*). `window.LBPlayer.state()`
+  (`{ itemGuid, positionSec, playing, started, song, chapter }`) supplies the
+  boostagram's `ts` when the player is inside the song; `started` is a
+  position past zero, never zero.
 
 ### `/booster/<npub>`
 
