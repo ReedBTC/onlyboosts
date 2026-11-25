@@ -441,7 +441,58 @@ export function stripBoilerplate(text) {
  * renderer calls this, the Boosts page's cards included, so a message reads
  * the same on every surface. */
 export function tidyBoostMessage(text) {
-  return stripBoilerplate(stripNoteRefs(text));
+  return stripBoilerplate(stripNoteRefs(stripOwnTemplate(text)));
+}
+
+/* ⚠️ THIS SITE'S OWN BOOST NOTE IS READ DOWN TO THE BOOSTER'S WORDS, SINCE
+ * 2026-11-25 (Reed's ask: an OnlyBoosts boost "isn't formatted the same as the
+ * other boosts", which show the message alone). The note externalBoostagram.js
+ * builds, and Local Bitcoiners' identical one, restates the card around the
+ * message:
+ *
+ *   <banner>
+ *   ⚡Just boosted 420 sats 📱 via onlyboosts.social
+ *   ⚠️ 4 of 5 splits paid          (only when a split failed)
+ *   👤 From <name>                  (only on the bot route)
+ *   💬 "<message>"                  (only with a message; may run several lines)
+ *   <gif url>                       (only with a GIF)
+ *
+ *   🎙️ <show> • <episode>
+ *   🎵 <song> - <artist>            (only when a song split landed)
+ *   <receipt reference>
+ *
+ * The figure, the app, the show, the episode and the song are on the card
+ * already. What stays is the message, the GIF and the From line, which names
+ * the person a bot-signed boost came from and is shown nowhere else. The
+ * banner and the receipt reference are left for the two strips after this
+ * one. A text that is not this template, to the line, comes back as it was:
+ * the header must match whole and the show line must follow it. The note
+ * itself is untouched; this is only how a message looks here. */
+const OWN_HEADER_RE = /^⚡Just boosted [\d,]+ sats 📱 via (?:onlyboosts\.social|localbitcoiners\.com)\s*$/;
+const OWN_SPLITS_RE = /^⚠️ \d+ of \d+ splits paid\s*$/;
+
+export function stripOwnTemplate(text) {
+  const src = String(text == null ? "" : text);
+  if (!src.includes("Just boosted")) return src;
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const h = lines.findIndex((l) => OWN_HEADER_RE.test(l));
+  if (h < 0) return src;
+  let e = -1;
+  for (let i = lines.length - 1; i > h; i--) if (lines[i].startsWith("🎙️ ")) { e = i; break; }
+  if (e < 0) return src;
+  const body = lines.slice(h + 1, e).filter((l) => !OWN_SPLITS_RE.test(l));
+  while (body.length && !body[body.length - 1].trim()) body.pop();
+  const m = body.findIndex((l) => l.startsWith('💬 "'));
+  if (m >= 0) {
+    body[m] = body[m].slice('💬 "'.length);
+    // The closing mark is on the message's last line, which is the body's last
+    // unless a GIF URL follows it on a line of its own.
+    let q = body.length - 1;
+    if (q > m && /^https?:\/\/\S+$/.test(body[q].trim())) q--;
+    if (body[q].endsWith('"')) body[q] = body[q].slice(0, -1);
+  }
+  const after = lines.slice(e + 1).filter((l) => !l.startsWith("🎵 "));
+  return [...lines.slice(0, h), ...body, ...after].join("\n").trim();
 }
 
 /* What a link reads as: the host (no scheme, no `www.`) and as much of the
