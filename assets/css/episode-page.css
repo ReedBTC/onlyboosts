@@ -65,7 +65,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.obp button {
+.obp-controls button {
   flex: none;
   font: inherit;
   color: var(--ink);
@@ -74,7 +74,7 @@
   border-radius: 999px;
   cursor: pointer;
 }
-.obp button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.obp-controls button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* A filled brand button is --brand-dd: --brand on white fails AA. */
 .obp .obp-play {
   width: 2.6rem; height: 2.6rem;
@@ -88,8 +88,8 @@
 }
 .obp .obp-chap { display: inline-flex; align-items: center; justify-content: center; }
 .obp .obp-chap[hidden] { display: none; }
-.obp button:disabled { opacity: 0.4; cursor: default; }
-.obp button:hover:not(:disabled) { border-color: var(--brand); }
+.obp-controls button:disabled { opacity: 0.4; cursor: default; }
+.obp-controls button:hover:not(:disabled) { border-color: var(--brand); }
 .obp-main { min-width: 0; }
 /* The buttons under the line: play and its four skips centred, the speed at
    the right edge. The empty first column balances the speed so the centre is
