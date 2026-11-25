@@ -48,6 +48,7 @@ function record(r, { linked = true } = {}) {
 export const PAGES = {
   "new-shows": {
     title: "New and Noteworthy Podcasts",
+    og: "Podcasts boosted on Nostr for the first time in the last 90 days, and podcasts boosted again after six months or more without a boost.",
     lead: "Podcasts boosted on Nostr for the first time in the last 90 days, by two or more members, and podcasts boosted again in that time after six months or more without a boost, ordered by boosters and then sats within those 90 days. A podcast with no new episode in six months is left out. The all-time charts bury a debut and a comeback; this is where they show.",
     rows: (env) => newShowsRows(env, 100, "podcast"),
     cards: (rows) => ({
@@ -58,6 +59,7 @@ export const PAGES = {
   },
   "new-music": {
     title: "New and Noteworthy Music",
+    og: "Albums whose first boost on Nostr landed in the last 90 days, by boosters then sats.",
     lead: "Albums whose first boost on Nostr landed in the last 90 days and that two or more members have boosted since, by boosters then sats. The all-time charts bury a debut; this is where one shows.",
     rows: (env) => newShowsRows(env, 100, "music"),
     cards: (rows) => ({
@@ -68,6 +70,7 @@ export const PAGES = {
   },
   "movers": {
     title: "Podcast Movers of the Last Week",
+    og: "The podcasts climbing the OnlyBoosts Charts: the last 7 days against the 7 days before them, the biggest climbs first.",
     lead: "The last 7 days' Shows chart against the 7 days before them, to 100 places: the biggest climbs first, then the shows in the top 100 of the last 7 days that were not in the 7 days before. The rank is the show's place over the last 7 days.",
     rows: (env) => moversRows(env, 100),
     cards: ({ picks, was }) => ({
@@ -80,6 +83,7 @@ export const PAGES = {
   },
   "podroll": {
     title: "Podcasters Recommend",
+    og: "The podcasts most often listed on other shows' podrolls, the recommendation podcasters write into their own feeds.",
     lead: "The shows most often listed on other shows' podrolls, the one recommendation podcasters write themselves into their feeds, by how many shows list them. A show the index has no page for yet is a figure, not a link.",
     rows: (env) => podrollRows(env, 100),
     cards: (rows) => ({
@@ -123,7 +127,10 @@ export async function onRequestGet(context) {
     const end = html.indexOf(CLOSE);
     if (start !== -1 && end > start) html = html.slice(0, start) + block + html.slice(end + CLOSE.length);
     html = html.replace("<title>Discover — OnlyBoosts</title>", `<title>${esc(page.title)} — OnlyBoosts</title>`)
-      .replace(`<link rel="canonical" href="${SITE}/discover" />`, `<link rel="canonical" href="${SITE}/discover/${esc(key)}" />`);
+      .replace(`<link rel="canonical" href="${SITE}/discover" />`, `<link rel="canonical" href="${SITE}/discover/${esc(key)}" />`)
+      .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/discover/${esc(key)}" />`)
+      .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${esc(page.title)} — OnlyBoosts" />`)
+      .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(page.og)}" />`);
   } catch (err) {
     console.warn("[discover] list not rendered", key, err);
   }
