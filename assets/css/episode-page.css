@@ -105,7 +105,7 @@
   min-height: 1.6rem;
 }
 .obp-now-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.obp-now-heart { flex: none; }
+.obp-now-heart { flex: none; display: flex; align-items: center; gap: 0.4rem; }
 
 .obp-track {
   position: relative;
@@ -176,7 +176,13 @@ html.obp-docked body { padding-bottom: 8.5rem; }
    song's heart. */
 .ep-song { display: flex; align-items: center; }
 .ep-song .ep-chapter-btn { flex: 1; min-width: 0; }
-.ep-song > [data-fav] { flex: none; margin-right: 0.75rem; }
+.ep-song-verbs {
+  flex: none; display: flex; align-items: center; gap: 0.4rem; margin-right: 0.75rem;
+}
+/* The site's boost pill beside a song's heart, in the list and on the
+   player's now-playing line: the row's gap spaces them, not the pill's own
+   right-aligning margin. */
+.ep-song-verbs .ob-boost-pill, .obp-now-heart .ob-boost-pill { margin-left: 0; }
 .ep-chapter-sub { color: var(--muted); }
 
 /* ── The player card, and the two drawers inside it ───────────────────── */

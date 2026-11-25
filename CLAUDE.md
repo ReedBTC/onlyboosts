@@ -284,10 +284,11 @@ The rules a change elsewhere would break:
   `isSyntheticGuid` / `realShowGuid` guard every site that hands a guid out.
 - **`/api/value` reads the show's own RSS first, Podcast Index as fallback**, and
   resolves the stored feed URL before the guid.
-- **⚠️ A BOOST ON `/episode` DURING A SONG PAYS THE SONG**: the window at the press
-  (`/api/value?at=`), the song's block at its percentage and the show's at the rest
-  (`combineTimeSplit`), the song in the note only if a song split landed
-  (`docs/money-paths.md`).
+- **⚠️ A SONG IS BOOSTED FROM ITS OWN BUTTON ON `/episode`** (song rows, the player's
+  now-playing line): `/api/value?at=&song=` checks the window against the feed, the
+  song's block at its percentage and the show's at the rest (`combineTimeSplit`), the
+  song in the note only if a song split landed. "Boost this Episode" pays the episode
+  alone (`docs/money-paths.md`).
 
 ## Data Rules That Reach The Site
 

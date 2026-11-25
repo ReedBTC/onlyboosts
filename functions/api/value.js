@@ -184,7 +184,13 @@ function valueFromXml(frag) {
 // pays songs). Half-open, and the latest start wins an overlap, which is the
 // player's rule too. A percentage outside 0..100 is no window at all, and so
 // is 0: nothing would go to the song.
-export function timeSplitAt(itemXml, at) {
+//
+// ⚠️ `want` IS THE SONG THE READER CHOSE (a song's own Boost button, Reed
+// 2026-11-25), and only a window naming that item can answer. The button sends
+// the window's start as `at` and the song's item guid as `song`; a feed edited
+// since the page loaded (the song moved or gone) answers no window, and the
+// page says so rather than paying whatever now sits at that second.
+export function timeSplitAt(itemXml, at, want = null) {
   const t = Number(at);
   if (!itemXml || !Number.isFinite(t) || t <= 0) return null;
   const el = firstValueElement(itemXml);
@@ -201,6 +207,7 @@ export function timeSplitAt(itemXml, at) {
     const r = parseAttrs(ri[1]);
     const feedGuid = (r.feedGuid || "").trim(), itemGuid = (r.itemGuid || "").trim();
     if (!feedGuid || !itemGuid || feedGuid.length > 400 || itemGuid.length > 400) continue;
+    if (want && itemGuid !== want) continue;
     const rawPct = a.remotePercentage;
     const pct = rawPct == null || String(rawPct).trim() === "" ? 100 : Number(rawPct);
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) continue;
@@ -229,7 +236,7 @@ function channelXml(xml) {
 //   { channel: value|null, item: value|null, itemFound: bool, truncated: bool }
 // An item whose closing tag never arrived (the cap) is not found; the caller
 // reads `truncated` to tell "not published" from "not read".
-export function readRssValue(xml, itemGuid, truncated = false, at = null) {
+export function readRssValue(xml, itemGuid, truncated = false, at = null, song = null) {
   const out = { channel: null, item: null, itemFound: false, truncated, timeSplit: null };
   if (!/<channel(?=[\s>])/i.test(xml)) return null;      // not RSS at all
   if (itemGuid) {
@@ -242,7 +249,7 @@ export function readRssValue(xml, itemGuid, truncated = false, at = null) {
       if (decodeEntities(stripCdata(g[1])).trim() !== want) continue;
       out.itemFound = true;
       out.item = valueFromXml(m[0]);
-      if (at != null) out.timeSplit = timeSplitAt(m[0], at);
+      if (at != null) out.timeSplit = timeSplitAt(m[0], at, song);
       break;
     }
   }
@@ -252,7 +259,7 @@ export function readRssValue(xml, itemGuid, truncated = false, at = null) {
 
 // Fetch the feed, bounded three ways. Null when it cannot be read as RSS;
 // otherwise readRssValue's answer, with `truncated` set if the cap cut it.
-async function fetchRssValue(feedUrl, itemGuid, at = null) {
+async function fetchRssValue(feedUrl, itemGuid, at = null, song = null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), RSS_TIMEOUT_MS);
   try {
@@ -281,7 +288,7 @@ async function fetchRssValue(feedUrl, itemGuid, at = null) {
       for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
       text = new TextDecoder("utf-8").decode(buf.subarray(0, RSS_MAX_BYTES));
     }
-    return readRssValue(text, itemGuid, truncated, at);
+    return readRssValue(text, itemGuid, truncated, at, song);
   } catch {
     return null;
   } finally {
@@ -344,6 +351,9 @@ export async function onRequest(context) {
   // Seconds into the episode when Boost was pressed; see timeSplitAt.
   const atRaw = params.get("at");
   const at = atRaw != null && /^\d{1,6}(\.\d{1,3})?$/.test(atRaw) ? Number(atRaw) : null;
+  // The song a song's Boost button names; see timeSplitAt.
+  const songRaw = (params.get("song") || "").trim();
+  const songGuid = songRaw && songRaw.length <= 400 ? songRaw : null;
 
   if (!feedId && !feedUrl && !podcastGuid) {
     return new Response(JSON.stringify({ error: "feedId, feedUrl or podcastGuid required" }), {
@@ -406,12 +416,12 @@ export async function onRequest(context) {
   // names — the same record the fallback below would read, so nothing is
   // worse than the old path.
   let rss = null;
-  if (rssUrl) rss = await fetchRssValue(rssUrl, guid, at);
+  if (rssUrl) rss = await fetchRssValue(rssUrl, guid, at, songGuid);
   else {
     const rec = await resolvePi();
     let u = null;
     try { const p = new URL(rec?.url || ""); if ((p.protocol === "http:" || p.protocol === "https:") && !p.username && !p.password) u = rec.url; } catch {}
-    if (u) rss = await fetchRssValue(u, guid, at);
+    if (u) rss = await fetchRssValue(u, guid, at, songGuid);
   }
   if (rss) {
     // The window rides only the item's own block: it is nested in it, and a

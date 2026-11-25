@@ -1586,7 +1586,9 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         noteHint: 'Posts a note saying you donated to OnlyBoosts. It carries no podcast tags, so it does not appear in the boost feeds.',
       }
     : {
-        header: '⚡ Boost episode',
+        // A song's own Boost button (the chapters list, the player bar) opens
+        // this screen with `episode.song`; the screen is then about the song.
+        header: episode?.song ? '⚡ Boost song' : '⚡ Boost episode',
         subject: episode?.showTitle || '',
         subjectNote: '',
         noteHint: '',
@@ -1665,18 +1667,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           </div>
 
           <div inert={pickingGif ? '' : undefined} className="px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
-            {copy.subject && (
+            {/* A song's boost names the song first, then the episode it was
+                heard on, then how the feed divides it (Reed, 2026-11-25: the
+                screen should say plainly which one is being boosted). */}
+            {!donation && episode?.song && (
+              <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
+                <span className="font-semibold text-[var(--ink,#0f2733)]">
+                  ♪ {episode.song.title || 'This song'}{episode.song.artist ? ` - ${episode.song.artist}` : ''}
+                </span>
+                <span className="block mt-0.5">
+                  on {episode?.episodeTitle ? <span className="italic">"{episode.episodeTitle}"</span> : 'this episode'}{copy.subject ? ` (${copy.subject})` : ''}
+                </span>
+                <span className="block mt-0.5">{fmtPct(episode.song.pct)} to the song, {fmtPct(100 - episode.song.pct)} to the show</span>
+              </div>
+            )}
+            {copy.subject && !(!donation && episode?.song) && (
               <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
                 <span className="font-semibold text-[var(--ink,#0f2733)]">{copy.subject}</span>
                 {!donation && episode?.episodeTitle && <span className="block italic mt-0.5">"{episode.episodeTitle}"</span>}
-                {/* The song on when Boost was pressed. Its share is the feed's
-                    own percentage; the rest goes to the show. */}
-                {!donation && episode?.song && (
-                  <span className="block mt-1 text-[var(--ink,#0f2733)]">
-                    ♪ {episode.song.title || 'The song playing'}{episode.song.artist ? ` - ${episode.song.artist}` : ''}
-                    <span className="text-[var(--muted,#5a7488)]"> · {fmtPct(episode.song.pct)} to the song, {fmtPct(100 - episode.song.pct)} to the show</span>
-                  </span>
-                )}
                 {copy.subjectNote && <span className="block mt-0.5">{copy.subjectNote}</span>}
               </div>
             )}

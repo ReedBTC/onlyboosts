@@ -1,9 +1,10 @@
-// Boosting the song that's playing (Part 4 of the time-splits work).
+// Boosting a song from its episode (Part 4 of the time-splits work).
 //
-// The /episode Boost button reads where the player is at the press, asks
-// /api/value for the <podcast:valueTimeSplit> window covering that second,
-// and pays the song's value block at the window's percentage and the show's at
-// the rest, in one press. This pins:
+// On /episode each song row and the player's now-playing line carry a Boost
+// button for that song. It asks /api/value for the <podcast:valueTimeSplit>
+// window naming that song, and pays the song's value block at the window's
+// percentage and the show's at the rest, in one press; "Boost this Episode"
+// pays the episode alone (Reed, 2026-11-25). This pins:
 //
 //   - the edge's window lookup: half-open, latest start wins, the spec's 100
 //     default, 0 or out-of-range is no window, recipients-only windows ignored
@@ -70,6 +71,8 @@ await check('the feed reader carries the window beside the item\'s own block', (
   assert.equal(r.item.recipients.length, 2)
   assert.equal(r.timeSplit.itemGuid, 'song-b')
   assert.equal(readRssValue(`<rss><channel><title>S</title>${ITEM}</channel></rss>`, 'host-item').timeSplit, null)
+  // the song filter reaches the window, not the episode's own guid
+  assert.equal(readRssValue(`<rss><channel><title>S</title>${ITEM}</channel></rss>`, 'host-item', false, 125, 'song-a').timeSplit.itemGuid, 'song-a')
 })
 await check('the endpoint only reads `at` as plain seconds', () => {
   const src = readFileSync(join(ROOT, 'functions/api/value.js'), 'utf8')
@@ -158,15 +161,30 @@ await check('⚠️ the edge ingest files it under the song, as the collector fi
   assert.deepEqual([row.podcast_guid, row.item_guid, row.sats], ['album-b', 'song-b', 1000])
 })
 
-console.log('\nThe /episode button:')
-await check('⚠️ the song is read once, at the press, and only once the episode is playing', () => {
-  const src = readFileSync(join(ROOT, 'assets/js/episode-page.js'), 'utf8')
-  const fn = src.slice(src.indexOf('async function resolveBoostAtPress'), src.indexOf('async function openBoost'))
-  assert.match(fn, /st\?\.started && st\.itemGuid === EPISODE\.itemGuid/)
-  assert.match(fn, /resolveValue\(EPISODE, EPISODE\.itemGuid, \{ at: ts \}\)/)
-  // and the click handler calls it, not the bare episode resolve
-  assert.match(src, /const \{ bundle, song, ts \} = await resolveBoostAtPress\(\)/)
+console.log('\nThe /episode buttons:')
+await check('⚠️ a song\'s button is answered only by a window naming that song', () => {
+  assert.equal(timeSplitAt(ITEM, 125, 'song-b').itemGuid, 'song-b')
+  assert.equal(timeSplitAt(ITEM, 125, 'song-a').itemGuid, 'song-a')   // the overlap: the chosen song, not the latest start
+  assert.equal(timeSplitAt(ITEM, 31, 'song-b'), null)                // the song is not at that second (a feed edited since)
 })
+{
+  const src = readFileSync(join(ROOT, 'assets/js/episode-page.js'), 'utf8')
+  const fn = src.slice(src.indexOf('async function resolveSongBoost'), src.indexOf('async function boostSong'))
+  await check('⚠️ a song boost asks the feed for that song and refuses a different one', () => {
+    assert.match(fn, /resolveValue\(EPISODE, EPISODE\.itemGuid, \{ at: probe, song: s\.itemGuid \}\)/)
+    assert.match(fn, /if \(!ws \|\| ws\.itemGuid !== s\.itemGuid\)/)
+    assert.match(fn, /if \(!combined\) return \{ message:/)
+  })
+  await check('⚠️ "Boost this Episode" pays the episode alone and never reads the player', () => {
+    const hero = src.slice(src.indexOf('async function initBoosting'), src.indexOf('initBoosting()\n'))
+    assert.match(hero, /const bundle = await resolveValue\(EPISODE, EPISODE\.itemGuid\)\n/)
+    assert.ok(!/LBPlayer|song|at:/.test(hero.replace(/\/\/.*$/gm, '')), 'the hero handler mentions the player or a song')
+  })
+  await check('every song row and the now-playing line carry the song\'s Boost button', () => {
+    assert.match(src, /player\.setSongs\(sgs, \{ heart: songHeartNode, boost: songBoostNode \}\)/)
+    assert.match(src, /const boost = songBoostNode\(r\.s\)/)
+  })
+}
 
 console.log(failed ? `\n${passed} passed, ${failed} FAILED.` : `\n${passed} passed.`)
 process.exit(failed ? 1 : 0)
