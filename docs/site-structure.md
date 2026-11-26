@@ -248,8 +248,8 @@ was picked from is in the session memory; direction A won, with the sans.
 - **The nav bar is direction A on every page** (`partials/nav.html`): logo and
   wordmark, the sections, the site search in the middle
   (`assets/js/nav-search.js`, loaded by `nav.js`, asking
-  `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
-  an About link, the account control. **Donate moved to `/about#support` on
+  `/api/v1/search?type=all` and `/api/v1/members?q=`), an About link, the
+  theme toggle, the account control. **Donate moved to `/about#support` on
   2026-11-26** (Reed's call) and the About link took its place in the bar. **A pasted npub, `nostr:npub…` or 64-hex
   pubkey is a MEMBER LOOKUP, not a search** (Reed's ask, 2026-10-22):
   `pubkeyQuery` in `nav-search.js` and again in `functions/search.js`

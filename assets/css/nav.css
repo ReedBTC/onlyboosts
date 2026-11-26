@@ -6,7 +6,7 @@
  *
  * THE BAR SINCE 2026-10-17 (Reed's pick, direction A of the discovery
  * homepage mockups): logo + wordmark, four section links, the site search
- * in the middle, then the theme toggle, About and the account control
+ * in the middle, then About, the theme toggle and the account control
  * (About replaced Donate on 2026-11-26; Donate lives on /about#support).
  * Under 760px the links fold into the hamburger's overlay and the search
  * takes its own full-width row under the bar. */
@@ -600,7 +600,8 @@ body.nav-explore-open { overflow: hidden; }
     height: 42px;
     margin: 0.15rem 0 0;
   }
-  .nav-theme-toggle { margin-left: auto; }
+  /* The first of the right-hand controls takes the slack. */
+  .nav-about { margin-left: auto; }
 }
 @media (max-width: 420px) {
   .nav-logo { width: 34px; height: 34px; }

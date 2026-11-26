@@ -549,20 +549,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v317" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v317" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -576,7 +576,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
      THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
      homepage mockups): logo and wordmark, the sections, the site search in
-     the middle, then the theme toggle, an About link and the account control
+     the middle, then an About link, the theme toggle and the account control
      (Donate moved to /about#support on 2026-11-26, Reed's call). On a
      phone the links fold into the hamburger's overlay (the Explore menu,
      which is also the site map the footer mirrors) and the search drops to
@@ -847,6 +847,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
       <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
     </form>
+    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
+         moved to /about#support and a small link to that page took its
+         place). It sits before the theme toggle, so the toggle is beside the
+         account control (Reed, the same day). The overlay and the footer
+         carry About as well. -->
+    <a class="nav-about" href="/about">About</a>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -854,10 +860,6 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
       <span class="ntt-moon" aria-hidden="true">🌙</span>
       <span class="ntt-sun" aria-hidden="true">☀️</span>
     </button>
-    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
-         moved to /about#support and a small link to that page took its
-         place). The overlay and the footer carry About as well. -->
-    <a class="nav-about" href="/about">About</a>
     <div id="lb-identity-slot" aria-label="Account">
       <!-- Static placeholder swapped out by IdentityWidget once the
            bundle loads. Picks shimmer vs sign-in based on whether a
@@ -978,12 +980,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v316" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v316" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v317" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v317" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v316"></script>
-<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v317"></script>
+<script src="/assets/js/sw-register.js?v=ob-v317" defer></script>
 </body>
 </html>`;
 }
@@ -1543,10 +1545,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v317" />
 </head>
 <body>
 <section class="page-header">
@@ -1565,7 +1567,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v317" defer></script>
 </body>
 </html>`;
   return new Response(html, {

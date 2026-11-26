@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v317" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v317" />
 </head>
 <body>
 
@@ -67,7 +67,7 @@
 
      THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
      homepage mockups): logo and wordmark, the sections, the site search in
-     the middle, then the theme toggle, an About link and the account control
+     the middle, then an About link, the theme toggle and the account control
      (Donate moved to /about#support on 2026-11-26, Reed's call). On a
      phone the links fold into the hamburger's overlay (the Explore menu,
      which is also the site map the footer mirrors) and the search drops to
@@ -338,6 +338,12 @@
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
       <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
     </form>
+    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
+         moved to /about#support and a small link to that page took its
+         place). It sits before the theme toggle, so the toggle is beside the
+         account control (Reed, the same day). The overlay and the footer
+         carry About as well. -->
+    <a class="nav-about" href="/about">About</a>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -345,10 +351,6 @@
       <span class="ntt-moon" aria-hidden="true">🌙</span>
       <span class="ntt-sun" aria-hidden="true">☀️</span>
     </button>
-    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
-         moved to /about#support and a small link to that page took its
-         place). The overlay and the footer carry About as well. -->
-    <a class="nav-about" href="/about">About</a>
     <div id="lb-identity-slot" aria-label="Account">
       <!-- Static placeholder swapped out by IdentityWidget once the
            bundle loads. Picks shimmer vs sign-in based on whether a
@@ -931,15 +933,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v316"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v317"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v317" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v316" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v317" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v316" defer></script>
+<script src="/assets/js/nav.js?v=ob-v317" defer></script>
 
 </body>
 </html>

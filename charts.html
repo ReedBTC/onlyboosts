@@ -78,20 +78,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v317" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v317" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v317" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v317" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />
 
   <style>
     :root {
@@ -902,12 +902,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v317" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v317" />
 </head>
 <body data-page="podcasts" data-view="shows" data-active-feed="shows-global">
 
@@ -921,7 +921,7 @@
 
      THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
      homepage mockups): logo and wordmark, the sections, the site search in
-     the middle, then the theme toggle, an About link and the account control
+     the middle, then an About link, the theme toggle and the account control
      (Donate moved to /about#support on 2026-11-26, Reed's call). On a
      phone the links fold into the hamburger's overlay (the Explore menu,
      which is also the site map the footer mirrors) and the search drops to
@@ -1192,6 +1192,12 @@
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
       <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
     </form>
+    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
+         moved to /about#support and a small link to that page took its
+         place). It sits before the theme toggle, so the toggle is beside the
+         account control (Reed, the same day). The overlay and the footer
+         carry About as well. -->
+    <a class="nav-about" href="/about">About</a>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -1199,10 +1205,6 @@
       <span class="ntt-moon" aria-hidden="true">🌙</span>
       <span class="ntt-sun" aria-hidden="true">☀️</span>
     </button>
-    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
-         moved to /about#support and a small link to that page took its
-         place). The overlay and the footer carry About as well. -->
-    <a class="nav-about" href="/about">About</a>
     <div id="lb-identity-slot" aria-label="Account">
       <!-- Static placeholder swapped out by IdentityWidget once the
            bundle loads. Picks shimmer vs sign-in based on whether a
@@ -2205,17 +2207,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v316"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v317"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v317" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v316" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v317" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v316"></script>
-<script src="/assets/js/nav.js?v=ob-v316" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v317"></script>
+<script src="/assets/js/nav.js?v=ob-v317" defer></script>
 
 </body>
 </html>

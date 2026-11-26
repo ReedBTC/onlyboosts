@@ -262,7 +262,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v316" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v317" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -300,8 +300,8 @@ export function renderCard(view) {
     kickerSub: COPY.intro,
     board,
     footer: "onlyboosts.social/charts#hpw",
-    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />`,
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />`,
     css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
@@ -377,16 +377,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v317" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v317" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v317" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -401,7 +401,7 @@ ${og ? `
 
      THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
      homepage mockups): logo and wordmark, the sections, the site search in
-     the middle, then the theme toggle, an About link and the account control
+     the middle, then an About link, the theme toggle and the account control
      (Donate moved to /about#support on 2026-11-26, Reed's call). On a
      phone the links fold into the hamburger's overlay (the Explore menu,
      which is also the site map the footer mirrors) and the search drops to
@@ -672,6 +672,12 @@ ${og ? `
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
       <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
     </form>
+    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
+         moved to /about#support and a small link to that page took its
+         place). It sits before the theme toggle, so the toggle is beside the
+         account control (Reed, the same day). The overlay and the footer
+         carry About as well. -->
+    <a class="nav-about" href="/about">About</a>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -679,10 +685,6 @@ ${og ? `
       <span class="ntt-moon" aria-hidden="true">🌙</span>
       <span class="ntt-sun" aria-hidden="true">☀️</span>
     </button>
-    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
-         moved to /about#support and a small link to that page took its
-         place). The overlay and the footer carry About as well. -->
-    <a class="nav-about" href="/about">About</a>
     <div id="lb-identity-slot" aria-label="Account">
       <!-- Static placeholder swapped out by IdentityWidget once the
            bundle loads. Picks shimmer vs sign-in based on whether a
@@ -765,10 +767,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v316" defer></script>
+<script src="/assets/js/nav.js?v=ob-v317" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v316"></script>
-<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v317"></script>
+<script src="/assets/js/sw-register.js?v=ob-v317" defer></script>
 </body>
 </html>`;
 }
