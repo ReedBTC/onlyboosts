@@ -16,7 +16,7 @@ Two separate things are both called "boost":
   its RSS feed. `externalBoost.js` / `externalBoostagram.js` / `payAllLegs.js`.
   This is the main event and it pays third parties.
 - **Donating to the site** — one leg at 100% to `RECIPIENT_LUD16`, behind the
-  nav's Donate button. **It runs the BOOST flow, not a flow of its own**:
+  Donate button on `/about#support` (in the nav bar until 2026-11-26). **It runs the BOOST flow, not a flow of its own**:
   `openSiteDonation` → `openExternalBoost` → `ExternalBoostModal` with a
   synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg* in
   `docs/money-paths.md`.
@@ -82,7 +82,7 @@ sections, so you know when to open it:
 | The Login Is Not A Gate On The Wallet | no Gate 1; a session-only wallet, and why the NWC URI is never persisted |
 | The Signer Session Survives The Tab | **since 2026-10-29**: the NIP-46 client secret's at-rest copy, wrapped under a non-extractable WebCrypto key in IndexedDB, so a phone's tab eviction no longer signs the member out; and **the login modal opens behind a tap, never on page load** (`forceLogoutWithMessage`'s `openLogin`) |
 | The Boost Modal Declares What Happens To The Note | two controls, four outcomes, `boostAnonymously` vs `noteRoute` |
-| A Donation Is The Boost Flow With One Leg | the nav's Donate button, and why a donation carries no `amount` tag |
+| A Donation Is The Boost Flow With One Leg | the Donate button on /about#support, and why a donation carries no `amount` tag |
 | Getting A Boost Into Helipad | the three tiers, and why tier one is preferred |
 | The Keysend Upgrade | the wallet gate, the `fountain.fm` exclusion, the whole-or-nothing routing pair |
 | The Wallet Gate Is Behind The Boost Button | compose first, pay second; `remembered` is not `connected` |

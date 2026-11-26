@@ -1,8 +1,9 @@
 // ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
-// Wires the two static nav placeholders — the Donate button and the
-// identity slot — to the ~1MB login-widget bundle, which stays
-// unloaded until a returning user's session restore or a nav click
-// actually needs it.
+// Wires the nav's identity slot, and /about's Donate button, to the
+// ~1MB login-widget bundle, which stays unloaded until a returning
+// user's session restore or a click actually needs it. (Donate was a
+// second nav placeholder until 2026-11-26, when it moved to
+// /about#support.)
 //
 // Loaded by every page (classic script at end of <body>, so it runs
 // with the nav already parsed). Previously inlined in index.html; it's
@@ -40,7 +41,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v315';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v316';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {
@@ -56,38 +57,38 @@
   // one in-flight promise rather than a second copy of this function.
   window.__lbEnsureWidget = ensureWidgetLoaded;
 
-  const boostPh = document.querySelector('[data-lb-boost-trigger="show"]');
-  if (boostPh) {
-    boostPh.addEventListener('click', async () => {
-      boostPh.disabled = true;
-      const long = boostPh.querySelector('.lb-label-long');
-      const short = boostPh.querySelector('.lb-label-short');
-      const prevLong = long ? long.textContent : '';
-      const prevShort = short ? short.textContent : '';
-      if (long) long.textContent = 'Loading…';
-      if (short) short.textContent = '…';
+  // /about#support's Donate button. ⚠️ THIS HANDLER OWNS EVERY PRESS NOW.
+  // While Donate lived in the nav, React mounted `BoostApp` over
+  // `#lb-boost-slot` once the bundle landed and governed every press after
+  // the first; no page carries that slot since 2026-11-26, so the button is
+  // never replaced and must come back to its resting state after each open.
+  const donateBtn = document.querySelector('[data-ob-donate]');
+  if (donateBtn) {
+    const label = donateBtn.querySelector('[data-ob-donate-label]');
+    const resting = label ? label.textContent : '';
+    donateBtn.addEventListener('click', async () => {
+      if (donateBtn.disabled) return;
+      donateBtn.disabled = true;
+      if (label) label.textContent = 'Loading…';
       try {
         await ensureWidgetLoaded();
-        // ⚠️ `openSiteDonation`, NOT `openShowBoost`. The nav's Donate button
-        // used to open the LB tip form, which signs its note before paying and
-        // therefore needs a signer by construction — so a visitor with no Nostr
-        // account could not donate at all. It now opens the same modal a podcast
-        // boost opens, with one leg at 100% to the site's own address.
-        // `openShowBoost` is still exported and still works; nothing on this
-        // fork calls it.
-        // ⚠️ NO FALLBACK TO `openShowBoost`, DELIBERATELY. There was one, and it
-        // is how this stayed broken: that method's first gate is a bare
+        // ⚠️ `openSiteDonation`, NOT `openShowBoost`. Donate used to open the
+        // LB tip form, which signs its note before paying and therefore needs
+        // a signer by construction, so a visitor with no Nostr account could
+        // not donate at all. It opens the same modal a podcast boost opens,
+        // with one leg at 100% to the site's own address.
+        // ⚠️ NO FALLBACK, DELIBERATELY. There was one, to `openShowBoost`, and
+        // it is how this stayed broken: that method's first gate was a bare
         // `api.requestLogin()`, so a missing `openSiteDonation` degraded into
-        // the exact login wall this flow exists to remove, silently and
-        // plausibly. A method that is not there should do nothing visible and
-        // say so in the console, not quietly run a different product.
+        // the exact login wall this flow exists to remove. A method that is
+        // not there should do nothing visible and say so in the console.
         if (window.LBLogin?.openSiteDonation) window.LBLogin.openSiteDonation();
         else console.error('[lb] openSiteDonation missing; the widget bundle is stale');
       } catch (e) {
-        if (long) long.textContent = prevLong;
-        if (short) short.textContent = prevShort;
-        boostPh.disabled = false;
         console.error('[lb] widget load failed', e);
+      } finally {
+        if (label) label.textContent = resting;
+        donateBtn.disabled = false;
       }
     });
   }

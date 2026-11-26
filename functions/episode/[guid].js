@@ -433,22 +433,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v315" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v315" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v316" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v315" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v316" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v315" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v316" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -462,7 +462,8 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
      THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
      homepage mockups): logo and wordmark, the sections, the site search in
-     the middle, then the theme toggle, Donate and the account control. On a
+     the middle, then the theme toggle, an About link and the account control
+     (Donate moved to /about#support on 2026-11-26, Reed's call). On a
      phone the links fold into the hamburger's overlay (the Explore menu,
      which is also the site map the footer mirrors) and the search drops to
      its own full-width row under the bar.
@@ -739,20 +740,10 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
       <span class="ntt-moon" aria-hidden="true">🌙</span>
       <span class="ntt-sun" aria-hidden="true">☀️</span>
     </button>
-    <div id="lb-boost-slot" aria-label="Donate">
-      <button
-        type="button"
-        class="lb-boost-placeholder"
-        data-lb-boost-trigger="show"
-        aria-label="Donate to OnlyBoosts"
-      >
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
-        </svg>
-        <span class="lb-label-long">Donate</span>
-        <span class="lb-label-short">Donate</span>
-      </button>
-    </div>
+    <!-- About, where Donate sat until 2026-11-26 (Reed's call: the button
+         moved to /about#support and a small link to that page took its
+         place). The overlay and the footer carry About as well. -->
+    <a class="nav-about" href="/about">About</a>
     <div id="lb-identity-slot" aria-label="Account">
       <!-- Static placeholder swapped out by IdentityWidget once the
            bundle loads. Picks shimmer vs sign-in based on whether a
@@ -864,12 +855,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v315" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v315" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v316" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v316" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v315"></script>
-<script src="/assets/js/sw-register.js?v=ob-v315" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v316"></script>
+<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
 </body>
 </html>`;
 }
@@ -1255,10 +1246,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v315" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v315" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v316" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v316" />
 </head>
 <body>
 <section class="page-header">
@@ -1276,7 +1267,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v315" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v316" defer></script>
 </body>
 </html>`;
   return new Response(html, {

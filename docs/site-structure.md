@@ -249,7 +249,8 @@ was picked from is in the session memory; direction A won, with the sans.
   wordmark, the sections, the site search in the middle
   (`assets/js/nav-search.js`, loaded by `nav.js`, asking
   `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
-  Donate, the account control. **A pasted npub, `nostr:npub…` or 64-hex
+  an About link, the account control. **Donate moved to `/about#support` on
+  2026-11-26** (Reed's call) and the About link took its place in the bar. **A pasted npub, `nostr:npub…` or 64-hex
   pubkey is a MEMBER LOOKUP, not a search** (Reed's ask, 2026-10-22):
   `pubkeyQuery` in `nav-search.js` and again in `functions/search.js`
   (the two must agree) sends it to the member endpoint alone, the
