@@ -18,7 +18,7 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { renderMessage, stripNoteRefs } from '../assets/js/nostr-text.js'
+import { renderMessage, stripNoteRefs, tidyBoostMessage } from '../assets/js/nostr-text.js'
 import {
   renderBoosts, boostRows, rowsFromRecords, sortBoostRows, filterBoostRows,
   searchBoostRows, filterBoostShow, BOOST_SORTERS, CONTROLS_MIN,
@@ -482,6 +482,32 @@ check('a receipt-only message renders empty and the row emits no body', () => {
   assert.doesNotMatch(html, /nevent1/)
   const withText = boostRows([{ ...row, message: 'hi ' + NEVENT }], names, SURFACES.show)
   assert.match(withText, /<div class="note-body">hi<\/div>/)
+})
+
+check('our own note template reads down to the message, the GIF and the From line', () => {
+  const banner = 'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png'
+  // DuhLaurien's show-level boost, 2026-11-24: no episode, a receipt quote
+  const duh = `${banner}\n⚡Just boosted 420 sats 📱 via onlyboosts.social\n💬 "Yay, another V4V music show!"\n\n🎙️ The OnlyBoosts Social Hour\nnostr:nevent1qvzqqqpxqupzqw585xwgq82hzydsjp2kjgja9vst88g4flynhm663u5xp3qfhpxeqyxhwumn8ghj7mn0wvhxcmmvqy2hwumn8ghj7un9d3shjtnyd968gmewwp6kyqg4waehxw309aex2mrp0yhx6mmnw3ezuur4vgqzpahhan457f7n05hrul3q4aa94jtjswn9m0l7zt6e8tstxnzc774tkkqd2r`
+  assert.equal(tidyBoostMessage(duh), 'Yay, another V4V music show!')
+  // every optional line at once, Local Bitcoiners' header, a two-line message
+  const full = '⚡Just boosted 1,234 sats 📱 via localbitcoiners.com\n⚠️ 4 of 5 splits paid\n👤 From Bob\n💬 "line one\nline two"\nhttps://media.tenor.com/x.gif\n\n🎙️ Show • Ep\n🎵 Song - Artist\nhttps://www.boostmebitch.com/?podcast=1'
+  assert.equal(tidyBoostMessage(full), '👤 From Bob\nline one\nline two\nhttps://media.tenor.com/x.gif')
+  // no message: nothing left, so the card emits no body
+  assert.equal(tidyBoostMessage('⚡Just boosted 5 sats 📱 via onlyboosts.social\n\n🎙️ A Show • Ep'), '')
+  // not our template, to the line: left exactly as it was
+  for (const other of [
+    'Just boosted ⚡ 420 sats to someone for Ep. 15\n\n"hi"',
+    '⚡Just boosted 5 sats 📱 via onlyboosts.social\n💬 "no show line"',
+    '⚡Just boosted 5 sats 📱 via fountain.fm\n💬 "x"\n\n🎙️ Show',
+  ]) assert.equal(tidyBoostMessage(other), other)
+})
+
+check('a repost looks up its note on the relays that hold boost notes', () => {
+  // 2026-11-26: the pool alone missed a Fountain boost, and the repost went
+  // out with nothing attached. The lookup names its relays; Fountain's first.
+  const src = readFileSync(new URL('../assets/js/boost-actions.js', import.meta.url), 'utf8')
+  assert.match(src, /const REPOST_LOOKUP_RELAYS = \[\s*'wss:\/\/relay\.fountain\.fm',/)
+  assert.match(src, /ndk\.fetchEvent\(\{ ids: \[ev\.id\] \}, \{ relayUrls: \[\.\.\.lookup\] \}\)/)
 })
 
 check('the Boosts page and the episode drawer apply the same strip', () => {

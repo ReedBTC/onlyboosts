@@ -401,7 +401,10 @@ export async function renderYearPage({ request, env, waitUntil }, year) {
       cacheable = true;
     }
     html = html.replace("<title>Charts of the Year — OnlyBoosts</title>", `<title>OnlyBoosts ${esc(year)} Charts — OnlyBoosts</title>`)
-      .replace(`<link rel="canonical" href="${SITE}/charts-year" />`, `<link rel="canonical" href="${SITE}/charts/${esc(year)}" />`);
+      .replace(`<link rel="canonical" href="${SITE}/charts-year" />`, `<link rel="canonical" href="${SITE}/charts/${esc(year)}" />`)
+      .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/charts/${esc(year)}" />`)
+      .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="OnlyBoosts ${esc(year)} Charts" />`)
+      .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="The Top 33 songs, artists, podcasts and boosters of ${esc(year)} by Nostr boosts, and the year in numbers." />`);
   } catch (err) {
     console.error("[year] boards failed", year, err);
   }

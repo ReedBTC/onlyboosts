@@ -416,7 +416,9 @@ console.log('\nLine structure and URLs:')
 const NOTE = [
   'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png',
   '⚡Just boosted 100 sats 📱 via onlyboosts.social',
-  '💬 "still testing"',
+  '💬 "still testing',
+  'on a second line',
+  'and a third"',
   '',
   '🎙️ Chad and Reeds Podcast • 003. Dimly LIT',
   'https://onlyboosts.social/episode/2c0b0505',
@@ -424,9 +426,12 @@ const NOTE = [
 
 check('the author\u2019s line breaks survive', () => {
   // The banner and the episode link are app boilerplate and come off
-  // (2026-11-07), so four lines remain with three breaks between them.
+  // (2026-11-07), and since 2026-11-25 so does this site's own template
+  // around the message (`stripOwnTemplate`): the booster's three lines remain,
+  // with two breaks between them.
   const out = renderMessage(NOTE, new Map())
-  assert.equal((out.match(/\n/g) || []).length, 3, 'newlines were collapsed')
+  assert.equal(out, 'still testing\non a second line\nand a third')
+  assert.equal((out.match(/\n/g) || []).length, 2, 'newlines were collapsed')
 })
 
 // ⚠️ REVERSED 2026-11-07, Reed's ask: a shared GIF shows as the GIF, in a
