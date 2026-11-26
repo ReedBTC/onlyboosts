@@ -502,6 +502,14 @@ check('our own note template reads down to the message, the GIF and the From lin
   ]) assert.equal(tidyBoostMessage(other), other)
 })
 
+check('a repost looks up its note on the relays that hold boost notes', () => {
+  // 2026-11-26: the pool alone missed a Fountain boost, and the repost went
+  // out with nothing attached. The lookup names its relays; Fountain's first.
+  const src = readFileSync(new URL('../assets/js/boost-actions.js', import.meta.url), 'utf8')
+  assert.match(src, /const REPOST_LOOKUP_RELAYS = \[\s*'wss:\/\/relay\.fountain\.fm',/)
+  assert.match(src, /ndk\.fetchEvent\(\{ ids: \[ev\.id\] \}, \{ relayUrls: \[\.\.\.lookup\] \}\)/)
+})
+
 check('the Boosts page and the episode drawer apply the same strip', () => {
   const feed = readFileSync(new URL('../assets/js/boosts-feed.js', import.meta.url), 'utf8')
   assert.match(feed, /import \{ tidyBoostMessage \} from '\/assets\/js\/nostr-text\.js\?v=/)

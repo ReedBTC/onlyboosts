@@ -19,9 +19,9 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v314'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v314'
-import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v314'
+} from '/assets/js/boosts-thread.js?v=ob-v315'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v315'
+import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v315'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {
@@ -462,6 +462,16 @@ async function handleLike(ev, btn) {
   }
 }
 
+// Where a boost note can be found to embed in a repost: Fountain's relay holds
+// most of them, Primal's and ditto take most of the rest, nos.lol is the
+// general fallback.
+const REPOST_LOOKUP_RELAYS = [
+  'wss://relay.fountain.fm',
+  'wss://relay.primal.net',
+  'wss://relay.ditto.pub',
+  'wss://nos.lol',
+]
+
 // ── Repost (NIP-18 kind 6, plain — no quote/q-tag) ───────────────────
 // Single-shot: once reposted we lock the button. Un-reposting would
 // require publishing a kind 5 deletion which is out of scope here.
@@ -506,8 +516,20 @@ async function handleRepost(ev, btn) {
         const ndk = window.LBLogin.getNDK()
         // One event by id. Bounded, because this runs on a click and a repost
         // that hangs is worse than one that degrades.
+        /* ⚠️ ASKED OF THE RELAYS THAT HOLD BOOST NOTES, NOT NDK'S OWN POOL
+         * (2026-11-26). The pool is ditto, nos.lol and mostr, cut for profile
+         * reads (ndk.js), and Fountain's boost notes are mostly not on it:
+         * Reed's repost of a Fountain boost published with nothing attached
+         * because the pool could not find the note, while relay.fountain.fm
+         * and relay.primal.net both held it. `relayUrls` replaces NDK's own
+         * choice of relays for this one lookup; the pool's sockets are added
+         * so the user's own relays are still asked. */
+        const lookup = new Set(REPOST_LOOKUP_RELAYS)
+        for (const url of ndk?.pool?.relays?.keys() || []) {
+          if (typeof url === 'string' && /^wss:\/\//i.test(url)) lookup.add(url)
+        }
         const found = await promiseWithTimeout(
-          ndk.fetchEvent({ ids: [ev.id] }),
+          ndk.fetchEvent({ ids: [ev.id] }, { relayUrls: [...lookup] }),
           6000,
           'lookup timed out',
         )
