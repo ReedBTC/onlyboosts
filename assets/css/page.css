@@ -259,6 +259,31 @@
   margin: 1.5rem 0 0.45rem;
 }
 .prose p { margin-bottom: 0.9rem; }
+
+/* /about#support's Donate button (moved off the nav bar on 2026-11-26). A
+   filled brand button is --brand-dd under white, the ramp's AA fill in both
+   themes; --brand under white is 2.50:1. */
+.prose .donate-row { margin: 1.25rem 0 0; }
+.donate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--brand-dd, #0a6fa8);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.donate-btn:hover { filter: brightness(1.12); }
+.donate-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.donate-btn:disabled { opacity: 0.6; cursor: wait; }
+.donate-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 .prose ul { margin: 0 0 1rem 1.15rem; }
 .prose li { margin-bottom: 0.5rem; }
 .prose strong { color: var(--ink); }

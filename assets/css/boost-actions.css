@@ -1,49 +1,19 @@
 /* Shared styles for boost mutation UI — the per-card action bar
    (Reply / Repost / Like / Zap), inline reply composer, zap modal,
-   toast notifications, and the nav-level identity + boost-the-show
-   slots. Used by /boosts.html and /ep### pages.
+   toast notifications, and the nav-level identity slot. Used by /boosts.html and /ep### pages.
 
    Pairs with assets/js/boost-actions.js. Relies on the host page
    defining the LB color variables on :root —
    --cream, --cream-d, --navy, --navy-l, --orange, --orange-d, --text,
    --muted, --border, --white. */
 
-/* ── Nav: Boost-the-Show + Identity placeholders ──────────────────
+/* ── Nav: Identity placeholder ──────────────────────────────────
    Visible immediately on page load, swapped out by the React widget
    bundle once it boots. The "skeleton-shimmer" pulse is what returning
    logged-in users see in the brief window before the IdentityWidget
-   replaces the placeholder with their avatar. */
-#lb-boost-slot {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-}
-.lb-boost-placeholder {
-  background: var(--orange);
-  color: #ffffff;
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.3rem 0.65rem;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  transition: background 0.15s;
-}
-.lb-boost-placeholder:hover { background: var(--orange-d); }
-.lb-boost-placeholder:disabled { opacity: 0.6; cursor: wait; }
-.lb-boost-placeholder svg { width: 11px; height: 11px; flex-shrink: 0; }
-.lb-boost-placeholder .lb-label-long { display: inline; }
-.lb-boost-placeholder .lb-label-short { display: none; }
-@media (max-width: 640px) {
-  .lb-boost-placeholder .lb-label-long { display: none; }
-  .lb-boost-placeholder .lb-label-short { display: inline; }
-}
-
+   replaces the placeholder with their avatar. (The Donate placeholder
+   that sat beside it moved to /about#support on 2026-11-26; its styles
+   are .donate-btn in page.css.) */
 #lb-identity-slot {
   flex-shrink: 0;
   display: flex;

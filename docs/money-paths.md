@@ -956,7 +956,8 @@ one msat more does not. Lower either copy and it fails.
 
 ### A Donation Is The Boost Flow With One Leg
 
-**The nav's Donate button opens `ExternalBoostModal`**, driven by a synthetic
+**The Donate button on `/about#support` opens `ExternalBoostModal`** (it sat in
+the nav bar on every page until 2026-11-26), driven by a synthetic
 bundle of one `lnaddress` recipient at 100% to `RECIPIENT_LUD16`. A donor gets
 everything a podcast boost gets: the wallet gate behind the press, the four note
 outcomes, Anon, Private Boost, per-leg retry, the 90-second watcher, and the
@@ -964,13 +965,18 @@ site-signed note for someone with no account. Writing a parallel modal would
 have meant two copies of a money path, and the copy exercised less is the one
 that rots.
 
-**⚠️ REACT OWNS THAT BUTTON, NOT `nav-widget-boot.js`.** The boot script's click
-handler governs only the press before the bundle lands; `createRoot(boostEl)`
-then mounts `BoostApp` over `#lb-boost-slot` and owns every press after. Wiring
-the boot script alone left Donate opening the login modal while every file
-anyone would grep said otherwise. `test-boost-modal-render.mjs` walks `BoostApp`
-and asserts it calls `openSiteDonation` and never `openShowBoost`, whose Gate 1
-was a bare `api.requestLogin()`. **That assertion is kept although
+**⚠️ SINCE 2026-11-26 `nav-widget-boot.js` OWNS THAT BUTTON.** While Donate was in
+the nav, the boot script's click handler governed only the press before the
+bundle landed; `createRoot(boostEl)` then mounted `BoostApp` over
+`#lb-boost-slot` and owned every press after, and wiring the boot script alone
+once left Donate opening the login modal while every file anyone would grep said
+otherwise. No page carries `#lb-boost-slot` now, so `BoostApp` never mounts and
+the `/about` button (`[data-ob-donate]`, site markup styled by `.donate-btn`)
+is never replaced: the boot script opens `openSiteDonation` on every press and
+returns the button to rest after each. `BoostApp` stays in the bundle until the
+next widget rebuild has a reason to drop it. `test-boost-modal-render.mjs` walks
+`BoostApp` and the boot script and asserts both call `openSiteDonation` and
+never `openShowBoost`, whose Gate 1 was a bare `api.requestLogin()`. **That assertion is kept although
 `openShowBoost` no longer exists**: it is cheap, and it is what would catch a
 future re-introduction of a login-gated flow behind the Donate button.
 

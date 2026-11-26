@@ -6,7 +6,8 @@
  *
  * THE BAR SINCE 2026-10-17 (Reed's pick, direction A of the discovery
  * homepage mockups): logo + wordmark, four section links, the site search
- * in the middle, then the theme toggle, Donate and the account control.
+ * in the middle, then About, the theme toggle and the account control
+ * (About replaced Donate on 2026-11-26; Donate lives on /about#support).
  * Under 760px the links fold into the hamburger's overlay and the search
  * takes its own full-width row under the bar. */
 
@@ -440,8 +441,20 @@ details.nav-ribbon { position: static; }
 .nav-explore-close:hover { background: rgba(255,255,255,0.18); }
 body.nav-explore-open { overflow: hidden; }
 
-/* ── Boost slot + identity slot ── */
-#lb-boost-slot,
+/* ── About link + identity slot ── */
+.nav-about {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  padding: 0.3rem 0.15rem;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-about:hover { color: #ffffff; border-bottom-color: var(--orange); }
+.nav-about:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 #lb-identity-slot {
   flex-shrink: 0;
   display: flex;
@@ -524,24 +537,6 @@ body.nav-explore-open { overflow: hidden; }
 [data-theme="dark"] .nav-theme-toggle .ntt-moon { display: none; }
 [data-theme="dark"] .nav-theme-toggle .ntt-sun { display: inline; }
 
-.lb-boost-placeholder {
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid rgba(255,255,255,0.35);
-  cursor: pointer;
-  font: inherit;
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.4rem 0.8rem;
-  border-radius: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  transition: background 0.15s, border-color 0.15s;
-}
-.lb-boost-placeholder:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.6); }
-
 /* ── Cart icon (unused since the strip; kept for the widget's class) ── */
 .nav-cart {
   position: relative;
@@ -577,12 +572,7 @@ body.nav-explore-open { overflow: hidden; }
   justify-content: center;
   box-shadow: 0 0 0 2px var(--navy);
 }
-.lb-boost-placeholder:disabled { opacity: 0.6; cursor: wait; }
-.lb-boost-placeholder svg { width: 11px; height: 11px; flex-shrink: 0; }
-.lb-boost-placeholder .lb-label-long { display: inline; }
-.lb-boost-placeholder .lb-label-short { display: none; }
-
-/* ── Tablet: keep one row, drop the Donate word to its glyph. ── */
+/* ── Tablet: keep one row, tighten the links. ── */
 @media (max-width: 980px) {
   .nav-links { gap: 0.9rem; }
   .nav-links a { font-size: 0.9rem; }
@@ -610,9 +600,8 @@ body.nav-explore-open { overflow: hidden; }
     height: 42px;
     margin: 0.15rem 0 0;
   }
-  .nav-theme-toggle { margin-left: auto; }
-  .lb-boost-placeholder .lb-label-long { display: none; }
-  .lb-boost-placeholder .lb-label-short { display: inline; }
+  /* The first of the right-hand controls takes the slack. */
+  .nav-about { margin-left: auto; }
 }
 @media (max-width: 420px) {
   .nav-logo { width: 34px; height: 34px; }

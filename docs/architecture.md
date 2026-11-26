@@ -312,7 +312,7 @@ What a change would break:
   `EDGE_PAGES` list is what keeps the Functions' nav and footer in sync**; a new
   edge-rendered page needs an entry there.
 - **The nav's lazy-widget bootstrap is `assets/js/nav-widget-boot.js`**, not
-  inline — it wires the Donate button and the identity slot to the 1MB
+  inline — it wires the identity slot, and /about's Donate button, to the 1MB
   login-widget bundle, loaded as a plain (non-defer) script at the end of `<body>`.
 - **Link pages without the `.html`.** Pages serves `/about` and 308-redirects
   `/about.html` to it, so an in-site link with the extension costs a redirect hop.

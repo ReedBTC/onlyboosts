@@ -453,6 +453,21 @@ console.log('\nThe themed classes emit real CSS:')
   assert.equal(/LBLogin\?\.openShowBoost|LBLogin\.openShowBoost/.test(boot), false,
     'nav-widget-boot falls back to openShowBoost, which degrades into a login gate')
   ok('the boot script has no silent fallback to the login-gated flow')
+
+  // Since 2026-11-26 Donate is /about#support's button and no page carries
+  // #lb-boost-slot, so BoostApp never mounts and the boot script owns every
+  // press. It must open the donation flow, and about.html must carry the hook.
+  assert.match(boot, /document\.querySelector\('\[data-ob-donate\]'\)/,
+    'the boot script no longer wires the /about Donate button')
+  assert.match(boot, /window\.LBLogin\.openSiteDonation\(\)/,
+    'the /about Donate button must open the donation flow')
+  const about = readFileSync(new URL('../about.html', import.meta.url), 'utf8')
+  assert.match(about, /<section id="support">[\s\S]*?data-ob-donate[\s\S]*?<\/section>/,
+    '/about#support lost its Donate button')
+  const nav = readFileSync(new URL('../partials/nav.html', import.meta.url), 'utf8')
+  assert.equal(/id="lb-boost-slot"/.test(nav), false, 'Donate is back in the nav bar')
+  assert.match(nav, /<a class="nav-about" href="\/about">About<\/a>/, 'the nav bar lost its About link')
+  ok('Donate lives on /about#support, and the nav bar carries About')
 }
 
 // ─── One split, another wallet: the guards that keep it to one payment ──────
