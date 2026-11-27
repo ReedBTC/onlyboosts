@@ -601,7 +601,7 @@
 // (`<pubkey>@<host>:<port>`) is paid to its pubkey rather than refused by the
 // wallet — a 2,200-sat leg to a .onion address failed three times on
 // 2026-09-04 with `encoding/hex: invalid byte: '@'`. Widget only.
-const VERSION = 'ob-v318';
+const VERSION = 'ob-v321';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -632,31 +632,31 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_favicon.png',
   '/assets/onlyboosts_pfp.png',
   // The masthead's banner. The TRANSPARENT one, which is the copy the page
-  // actually renders; the opaque `onlyboosts_banner.png` beside it is the
-  // og:image fallback, fetched by preview crawlers and never by a browser, so
-  // precaching it spent 93KB on every install for nothing.
+  // actually renders. The preview cards (assets/og/) are fetched by preview
+  // crawlers and never by a browser, so none of them is precached; nor is the
+  // opaque `onlyboosts_banner.png`, the og:image until 2026-11-27.
   '/assets/onlyboosts_banner_clear.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v318',
-  '/assets/css/page.css?v=ob-v318',
-  '/assets/css/nav.css?v=ob-v318',
-  '/assets/css/footer.css?v=ob-v318',
-  '/assets/css/boosts-thread.css?v=ob-v318',
-  '/assets/css/boost-actions.css?v=ob-v318',
+  '/assets/css/theme.css?v=ob-v321',
+  '/assets/css/page.css?v=ob-v321',
+  '/assets/css/nav.css?v=ob-v321',
+  '/assets/css/footer.css?v=ob-v321',
+  '/assets/css/boosts-thread.css?v=ob-v321',
+  '/assets/css/boost-actions.css?v=ob-v321',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v318',
-  '/assets/js/boosts-thread.js?v=ob-v318',
+  '/assets/css/feed-cards.css?v=ob-v321',
+  '/assets/js/boosts-thread.js?v=ob-v321',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v318',
-  '/assets/js/boost-actions.js?v=ob-v318',
-  '/assets/js/nav.js?v=ob-v318',
-  '/assets/js/nav-widget-boot.js?v=ob-v318',
-  '/assets/js/widget-loader.js?v=ob-v318',
-  '/assets/js/sw-register.js?v=ob-v318',
+  '/assets/js/primal-profiles.js?v=ob-v321',
+  '/assets/js/boost-actions.js?v=ob-v321',
+  '/assets/js/nav.js?v=ob-v321',
+  '/assets/js/nav-widget-boot.js?v=ob-v321',
+  '/assets/js/widget-loader.js?v=ob-v321',
+  '/assets/js/sw-register.js?v=ob-v321',
 ];
 
 self.addEventListener('install', (event) => {

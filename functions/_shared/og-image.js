@@ -14,7 +14,9 @@
 
 export const MAX_IMAGE_BYTES = 900 * 1024;
 export const TTL_FALLBACK = 300;
-export const BANNER_PATH = "/assets/onlyboosts_banner.png";
+// The generic preview card since 2026-11-27 (assets/brand/og_card.html); the wide
+// banner it replaced cropped to "Only BOOS" in a square thumbnail.
+export const BANNER_PATH = "/assets/og/onlyboosts.png";
 
 // Stream the body, bailing once cumulative bytes exceed the cap. arrayBuffer()
 // would buffer the whole thing before we could check size.

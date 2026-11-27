@@ -42,19 +42,22 @@
   <meta property="og:title" content="Boost Stats — OnlyBoosts" />
   <meta property="og:description" content="Charts and totals over every podcast boost published to Nostr; sats over time, the shows receiving most, and who is sending. Coming soon to OnlyBoosts." />
   <meta property="og:site_name" content="OnlyBoosts" />
-  <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
+  <meta property="og:image" content="https://onlyboosts.social/assets/og/onlyboosts.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="OnlyBoosts" />
   <meta name="twitter:card" content="summary_large_image" />
 
   <!-- Self-hosted fonts. Variable WOFF2s — one file per family per
        style covers all needed weights. -->
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v318" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v318" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v321" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v321" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v318" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v318" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v321" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v321" />
 </head>
 <body>
 
@@ -448,14 +451,14 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v318"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v321"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v318" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v321" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v318" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v321" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v318" defer></script>
+<script src="/assets/js/nav.js?v=ob-v321" defer></script>
 </body>
 </html>

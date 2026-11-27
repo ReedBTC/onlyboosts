@@ -354,6 +354,15 @@ function figure(title, lead, body, foot) {
   return `<section class="yc-fig"><h2>${esc(title)}</h2>${lead ? `<p class="yc-lead">${lead}</p>` : ""}${body}${foot}</section>`;
 }
 
+/* ⚠️ THE YEARS WITH A PREVIEW CARD OF THEIR OWN (2026-11-27, Reed: the 2026
+ * link will be shared a lot, and mynostr.app's square thumbnail cut the wide
+ * banner down to "Only BOOS"). Each is assets/og/charts-<year>.png, rendered by
+ * scripts/render-brand.sh from assets/brand/og_card.html?t=<year> Charts, with
+ * its essentials inside the centre square so a cropped thumbnail still reads.
+ * A year is added here only once its PNG exists; an og:image that 404s is a
+ * blank preview, which is worse than the generic card. */
+const YEAR_CARDS = new Set(["2026"]);
+
 export function yearHtml(d) {
   const y = d.year;
   const empty = "No Nostr boosts in this year yet.";
@@ -400,13 +409,24 @@ export async function renderYearPage({ request, env, waitUntil }, year) {
       html = html.slice(0, start) + yearHtml(data) + html.slice(end + CLOSE.length);
       cacheable = true;
     }
-    html = html.replace("<title>Charts of the Year — OnlyBoosts</title>", `<title>OnlyBoosts ${esc(year)} Charts — OnlyBoosts</title>`)
-      .replace(`<link rel="canonical" href="${SITE}/charts-year" />`, `<link rel="canonical" href="${SITE}/charts/${esc(year)}" />`)
-      .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/charts/${esc(year)}" />`)
-      .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="OnlyBoosts ${esc(year)} Charts" />`)
-      .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="The Top 33 songs, artists, podcasts and boosters of ${esc(year)} by Nostr boosts, and the year in numbers." />`);
   } catch (err) {
     console.error("[year] boards failed", year, err);
+  }
+  // ⚠️ THE HEAD IS THE YEAR'S EVEN WHEN THE BOARDS FAIL (2026-11-27). These
+  // rewrites sat inside the try, so a failed D1 read served a preview fetcher
+  // the shell's generic title, canonical and card, and fetchers keep the first
+  // preview they get. The data decides the body and the cache; never the head.
+  html = html.replace("<title>Charts of the Year — OnlyBoosts</title>", `<title>OnlyBoosts ${esc(year)} Charts — OnlyBoosts</title>`)
+    .replace(`<link rel="canonical" href="${SITE}/charts-year" />`, `<link rel="canonical" href="${SITE}/charts/${esc(year)}" />`)
+    .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/charts/${esc(year)}" />`)
+    .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="OnlyBoosts ${esc(year)} Charts" />`)
+    .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="The Top 33 songs, artists, podcasts and boosters of ${esc(year)} by Nostr boosts, and the year in numbers." />`);
+  // The year's own preview card, where one has been rendered (YEAR_CARDS);
+  // any other year keeps the generic card the shell carries. Both are 1200x630.
+  if (YEAR_CARDS.has(String(year))) {
+    html = html
+      .replace(/<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${SITE}/assets/og/charts-${esc(year)}.png" />`)
+      .replace(/<meta property="og:image:alt" content="[^"]*" \/>/, `<meta property="og:image:alt" content="OnlyBoosts ${esc(year)} Charts" />`);
   }
   const resp = new Response(html, {
     status: 200,
