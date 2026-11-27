@@ -631,6 +631,15 @@ def _migrate(conn):
         # refresh gate keeps it moving (daily for a show with a recent episode,
         # monthly for a dormant one, which is the one that does not change).
         conn.execute("ALTER TABLE shows ADD COLUMN newest_item_ts INTEGER")
+    if "feed_moved_to" not in show_cols:
+        # 2026-11-27: where the show's feed now lives, when the podroll sweep's
+        # fetch of `feed_url` was answered by permanent redirects only (301/308).
+        # The show refresh hands it to enrich.resolve_show, which takes the
+        # Podcast Index entry at that address over byguid's when both name the
+        # same podcast:guid (record_feed_move). Never cleared by a clean fetch of
+        # the new address: once switched, feed_url IS that address and the fetch
+        # has nothing to redirect, yet byguid still names the old entry.
+        conn.execute("ALTER TABLE shows ADD COLUMN feed_moved_to TEXT")
     # Show similarity (similar.py): recomputed whole on the daily podroll run,
     # replaced wholesale in D1 on the podroll rule. rank is 1..TOP per show.
     conn.execute("""CREATE TABLE IF NOT EXISTS show_similar (
@@ -1334,6 +1343,18 @@ def replace_podroll(conn, source_guid, items):
         [(source_guid, i, it.get("target_guid"), it.get("target_url"),
           it.get("target_title"), it.get("target_medium"), now)
          for i, it in enumerate(items)])
+
+
+def record_feed_move(conn, podcast_guid, moved_to):
+    """The podroll sweep saw this show's feed permanently redirect to `moved_to`."""
+    conn.execute("UPDATE shows SET feed_moved_to=? WHERE podcast_guid=?",
+                 (moved_to, podcast_guid))
+
+
+def feed_moved_to(conn, podcast_guid):
+    row = conn.execute("SELECT feed_moved_to FROM shows WHERE podcast_guid=?",
+                       (podcast_guid,)).fetchone()
+    return row[0] if row else None
 
 
 def mark_podroll_checked(conn, source_guid, status):

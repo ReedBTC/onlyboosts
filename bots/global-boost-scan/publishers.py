@@ -117,7 +117,7 @@ def _probe_one(row, session):
            "status": None, "meta": None, "albums": None}
     for attempt in range(RETRY_429 + 1):
         try:
-            status, text = fetch_feed_head(out["feed_url"], session)
+            status, text, _ = fetch_feed_head(out["feed_url"], session)
             if status == 429 and attempt < RETRY_429:
                 time.sleep(2 ** attempt * 3)
                 continue

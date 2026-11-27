@@ -966,7 +966,7 @@ def _refresh_shows(conn, key, secret):
           f"({recent_due} recent, {old_due} dormant due)...")
     changed = missed = 0
     for pg in shows:
-        info = enrich.resolve_show(pg, key, secret)
+        info = enrich.resolve_show(pg, key, secret, moved_to=db.feed_moved_to(conn, pg))
         if info:
             changed += bool(db.upsert_show(conn, info))
         else:
@@ -1261,6 +1261,8 @@ def _store_podroll(conn, results):
             pub = r.get("publisher") or {}
             db.set_show_publisher(conn, r["podcast_guid"],
                                   pub.get("guid"), pub.get("url"))
+        if r.get("moved_to") and r["moved_to"] != r["feed_url"]:
+            db.record_feed_move(conn, r["podcast_guid"], r["moved_to"])
         db.mark_podroll_checked(conn, r["podcast_guid"], r["status"])
     conn.commit()
     return counts, edges
