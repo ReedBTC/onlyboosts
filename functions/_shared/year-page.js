@@ -364,7 +364,6 @@ export function yearHtml(d) {
   return `<h1>OnlyBoosts ${y} Charts</h1>
     <p class="search-lead"><a href="/about#charts">How the charts work.</a></p>
     ${statCards(d)}
-    ${d.stats ? monthsChart(d) : ""}
     <div class="hpw-boards year-boards">
       ${board("songs", `Top Songs of ${y}`, d.songs)}
       ${board("artists", `Top Artists of ${y}`, d.artists)}
@@ -375,6 +374,7 @@ export function yearHtml(d) {
         rows: d.boosters.map((m) => memberChartRowHtml(m)),
       })}
     </div>
+    ${d.stats ? monthsChart(d) : ""}
     ${d.stats ? `<div class="yc-pair">${appsChart(d)}${hpwChart(d)}</div>` : ""}`;
 }
 
