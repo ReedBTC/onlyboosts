@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS boost_credits (
 CREATE INDEX IF NOT EXISTS idx_credits_podcast ON boost_credits(podcast_guid);
 CREATE INDEX IF NOT EXISTS idx_credits_item    ON boost_credits(item_guid);
 
+-- Every collector alias (guid_aliases, chains flattened), so /show/<old guid>
+-- can redirect after a show is merged into another. Replaced whole by the delta
+-- when the alias set changes (d1_sync.push_aliases, which carries this DDL).
+CREATE TABLE IF NOT EXISTS podcast_aliases (
+  from_guid TEXT PRIMARY KEY,
+  to_guid   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS podcasts (
   podcast_guid  TEXT PRIMARY KEY,
   title         TEXT,

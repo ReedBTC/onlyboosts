@@ -127,7 +127,8 @@ import io, contextlib
 buf = io.StringIO()
 with contextlib.redirect_stdout(buf):
     d1_sync.cmd_remote_delta(None)
-line = buf.getvalue().strip().splitlines()[-1]
+# The delta's summary line; the credit and alias pushes may print after it.
+line = next(l for l in buf.getvalue().strip().splitlines() if l.startswith("D1 delta"))
 print("   ", line)
 allsql = "\n".join(pushed)
 check("edge: 1 replaced, 1 repushed, 1 removed, 1 orphaned, 1 pending" in line, "the delta reports every edge case")

@@ -1729,6 +1729,21 @@ def apply_aliases(conn):
               AND a.raw_guid NOT IN ({live})""")
     conn.commit()
 
+    # ⚠️ A CHAIN IS FOLLOWED TO ITS END. An alias's canonical guid can itself be
+    # aliased: since 2026-11-27 a real guid can be merged by hand onto another
+    # (resolve_guids `exact`), and Fountain had already mapped its own phantoms
+    # onto those guids, so one hop left 3 boosts on the merged-away guid (Abel
+    # James, Bitcoin Magazine). Rewriting the ledger to the end guid makes the
+    # one-hop UPDATE below right; a cycle is left as it is.
+    amap = dict(conn.execute("SELECT raw_guid, canonical_guid FROM guid_aliases"))
+    for raw, canon in amap.items():
+        end, seen = canon, {raw}
+        while end in amap and end not in seen:
+            seen.add(end)
+            end = amap[end]
+        if end != canon and end != raw:
+            conn.execute("UPDATE guid_aliases SET canonical_guid=? WHERE raw_guid=?", (end, raw))
+
     to_change = [r[0] for r in conn.execute(
         """SELECT b.event_id FROM boosts b JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
            WHERE b.canonical_guid IS NOT a.canonical_guid""").fetchall()]

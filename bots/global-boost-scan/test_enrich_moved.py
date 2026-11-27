@@ -74,6 +74,32 @@ for label, entry in (("another guid", {**NEW, "podcastGuid": "a59a6c9e-0753-5675
     show, _ = run(entry, NEW_URL)
     check(show["feed_id"] == 7683299 and show["image"] == "old.jpg", label)
 
+print("a pinned feed (resolve_guids `feeds`) crosses guids and keeps ours")
+OTHER_GUID = {**NEW, "podcastGuid": "a82d1f80-acc3-5509-a3c2-02a3bea464bd"}
+def run_pinned(byfeedurl):
+    calls = []
+    def fake(path, params, key, secret):
+        calls.append(path)
+        return {"podcasts/byguid": {"feed": OLD}, "podcasts/byfeedurl": {"feed": byfeedurl or {}},
+                "episodes/byfeedid": {"items": []}}[path]
+    enrich.pi_get = fake
+    return enrich.resolve_show(GUID, "k", "s", moved_to=None, pinned_feed=NEW_URL)
+show = run_pinned(OTHER_GUID)
+check(show["feed_id"] == 8129640 and show["podcast_guid"] == GUID, "the pinned entry, filed under our guid")
+show = run_pinned({**OTHER_GUID, "lastHttpStatus": 410})
+check(show["feed_id"] == 7683299, "a pinned entry that does not answer is not taken")
+show, _ = run(OTHER_GUID, NEW_URL)
+check(show["feed_id"] == 7683299, "unpinned, another guid is still refused")
+
+print("d1_sync.alias_pairs flattens chains")
+import sqlite3, d1_sync   # noqa: E402
+c = sqlite3.connect(":memory:")
+c.execute("CREATE TABLE guid_aliases (raw_guid TEXT PRIMARY KEY, canonical_guid TEXT)")
+c.executemany("INSERT INTO guid_aliases VALUES (?,?)", [("a", "b"), ("b", "c"), ("x", "y"), ("loop1", "loop2"), ("loop2", "loop1")])
+pairs = dict(d1_sync.alias_pairs(c))
+check(pairs["a"] == "c" and pairs["b"] == "c" and pairs["x"] == "y", "a→b→c lands on c")
+check("loop1" not in pairs and "loop2" not in pairs, "a cycle terminates and redirects nowhere")
+
 print("podroll.moved_to")
 r = lambda codes, url=NEW_URL: NS(history=[NS(status_code=c) for c in codes], url=url)
 check(podroll.moved_to(r([301])) == NEW_URL, "one 301")

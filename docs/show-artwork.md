@@ -156,3 +156,18 @@ Bitcoiners, Bitcoin Rails, Nightmares, Dr. Fernando Morales Podcast), every
 one a 301 chain, and seven moves onto a new guid. Wavlake rate-limited 276
 music feeds out of that measurement. `test_enrich_moved.py` pins the rule.
 
+**A move onto a new guid is a hand decision.** Reed's calls, 2026-11-27, on the
+seven boosted shows whose redirect lands on a feed Podcast Index files under
+another guid. Three were a host serving its own feed by 302 and are left alone
+(The Daily Ratings, The Dick Show, The Progressive Bitcoiner). Three moved and
+their publishers declared the new guid in the new feed, so the old guid is
+merged onto it with a `resolve_guids` curated `exact` entry, which since that
+day also takes a real guid: The Pete Quiñones Show and Abel James Show (both
+already split across two pages) and Bitcoin Magazine Podcast. Radio Detox moved
+with a 301 to a feed declaring no guid, while every boost still names the old
+one, so the old guid stays the page: a curated `feeds` entry pins it to the new
+feed's Podcast Index entry (`moved_entry(pinned=True)`, the one path that
+crosses guids), and the new feed's computed guid is merged onto the old.
+D1's `podcast_aliases` (every alias, chains flattened) lets `/show/<old guid>`
+redirect to the show it became.
+

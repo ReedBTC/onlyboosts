@@ -19,6 +19,7 @@ metadata (the `meta_synced_at` watermark) — see build_meta_drift_sql.
 """
 
 import argparse
+import hashlib
 import sys
 import time
 from pathlib import Path
@@ -618,6 +619,50 @@ def push_credits(conn, cf):
     return f"D1 credits: pushed {len(synced)} split credit row(s), removed {len(pairs)} boost(s)' credits"
 
 
+# Every collector alias, for the site's /show redirect: a guid merged into
+# another (resolve_guids `exact`, 2026-11-27) loses its podcasts row, and an old
+# link should land on the show it became. Replaced whole when the set changes.
+ALIASES_DDL = ["CREATE TABLE IF NOT EXISTS podcast_aliases (from_guid TEXT PRIMARY KEY, "
+               "to_guid TEXT NOT NULL);"]
+ALIASES_DIGEST = "d1_aliases_digest"
+
+
+def alias_pairs(conn):
+    """(from_guid, to_guid) for every alias, chains flattened to the end guid."""
+    m = dict(conn.execute("SELECT raw_guid, canonical_guid FROM guid_aliases"))
+    out = []
+    for raw, canon in m.items():
+        seen = {raw}
+        while canon in m and canon not in seen:
+            seen.add(canon)
+            canon = m[canon]
+        if canon != raw:
+            out.append((raw, canon))
+    return sorted(out)
+
+
+def build_aliases_sql(pairs):
+    out = list(ALIASES_DDL) + ["DELETE FROM podcast_aliases;"]
+    for i in range(0, len(pairs), 100):
+        out.append("INSERT INTO podcast_aliases (from_guid,to_guid) VALUES "
+                   + ",".join(f"({q(a)},{q(b)})" for a, b in pairs[i:i + 100]) + ";")
+    return out
+
+
+def push_aliases(conn, cf):
+    """Replace podcast_aliases when the alias set changed; a log line or None."""
+    pairs = alias_pairs(conn)
+    digest = hashlib.sha256(repr(pairs).encode()).hexdigest()
+    if db.get_meta(conn, ALIASES_DIGEST) == digest:
+        return None
+    ok, detail = _d1_exec(*cf, "\n".join(build_aliases_sql(pairs)))
+    if not ok:
+        return f"[warn] podcast_aliases not pushed: {detail}"
+    db.set_meta(conn, ALIASES_DIGEST, digest)
+    conn.commit()
+    return f"D1 aliases: replaced with {len(pairs)} row(s)"
+
+
 def build_reproject_sql(conn, queue):
     """SQL for the `d1_reproject` queue — rows the boost delta can't reach.
 
@@ -908,9 +953,10 @@ def cmd_remote_delta(args):
     if not stmts:
         print("D1 delta: nothing new to sync")
         _set_watermark(conn, META_WATERMARK, started)
-        line = push_credits(conn, cf)
-        if line:
-            print(line)
+        for push in (push_credits, push_aliases):
+            line = push(conn, cf)
+            if line:
+                print(line)
         return
 
     BATCH = 100
@@ -938,9 +984,10 @@ def cmd_remote_delta(args):
     if skipped:
         print(f"  skipped {skipped} newly-boosted episode(s) with no metadata row "
               f"(standing enrichment gap: {db.enrichment_gap_size(conn)})")
-    line = push_credits(conn, cf)
-    if line:
-        print(line)
+    for push in (push_credits, push_aliases):
+        line = push(conn, cf)
+        if line:
+            print(line)
 
 
 def cmd_remote_podroll(args):
