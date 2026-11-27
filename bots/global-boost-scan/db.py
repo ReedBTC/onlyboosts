@@ -880,6 +880,18 @@ def upsert_episode(conn, ep):
     due again on the very next tick.
     """
     now = int(time.time())
+    ep = dict(ep)
+    # ⚠️ AN EPISODE IS FILED UNDER OUR GUID FOR ITS SHOW, NOT PODCAST INDEX'S.
+    # A show pinned to a moved feed (resolve_guids `feeds`, Radio Detox
+    # 2026-11-27) is read through a PI entry that carries ANOTHER guid, and
+    # episodes/byguid reports that guid; stored as-is, 25 episodes left their
+    # show and their pages named an untitled one. The alias is our decision
+    # that the two are one show, so it applies here too.
+    if ep.get("podcast_guid") and _has_table(conn, "guid_aliases"):
+        a = conn.execute("SELECT canonical_guid FROM guid_aliases WHERE raw_guid=?",
+                         (ep["podcast_guid"],)).fetchone()
+        if a and a[0]:
+            ep["podcast_guid"] = a[0]
     before = conn.execute(
         f"SELECT updated_at, duration_src, {', '.join(EPISODE_CONTENT_COLS)} "
         f"FROM episodes WHERE item_guid=?",

@@ -65,6 +65,17 @@ with tempfile.TemporaryDirectory() as tmp:
     check(resolve_guids.derive(conn, SHOW, "k", "s", {**hand, "exact": {SHOW: SHOW}}) is None,
           "an entry naming itself is no merge")
 
+    print("an episode PI files under an aliased guid is stored under ours (Radio Detox)")
+    db.upsert_alias(conn, NEW, SHOW, "curated")
+    db.upsert_episode(conn, {"item_guid": "ep-pinned", "title": "t", "image": None, "published": NOW,
+                             "duration": 60, "episode_number": None, "podcast_guid": NEW,
+                             "feed_id": 7900644, "enclosure_url": None, "enclosure_type": None,
+                             "description": None})
+    got = conn.execute("SELECT podcast_guid FROM episodes WHERE item_guid='ep-pinned'").fetchone()[0]
+    check(got == SHOW, f"filed under the show's guid ({got})")
+    conn.execute("DELETE FROM episodes WHERE item_guid='ep-pinned'")
+    conn.execute("DELETE FROM guid_aliases WHERE raw_guid=?", (NEW,)); conn.commit()
+
     print("apply_aliases follows a chain: phantom -> old guid -> new guid")
     db.upsert_alias(conn, "chainraw-1", SHOW, "curated")
     db.upsert_alias(conn, SHOW, NEW, "curated")
