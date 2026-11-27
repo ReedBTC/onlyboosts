@@ -502,19 +502,30 @@ site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
 event ever published. Both names resolve from the one `.well-known/nostr.json`:
 `onlyboosts@` and `boostbot@`.
 
-**⚠️ THE BANNER IS TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
+**⚠️ THE PREVIEW IMAGE IS A CARD, NOT THE BANNER, SINCE 2026-11-27.**
+`assets/og/onlyboosts.png` (1200x630, navy, the mark and the name large) is the
+`og:image` on every page plus `OG_FALLBACK` on the four detail pages and
+`BANNER_PATH` in `functions/_shared/og-image.js`, the fallback of every image
+route. It and every page card (`assets/og/charts-<year>.png` so far) render
+from one template, `assets/brand/og_card.html`, by `scripts/render-brand.sh`.
+**Everything that matters sits inside the centre 600px**: Reed's report was
+mynostr.app cutting a square thumbnail out of the 3:1 banner and showing
+"Only BOOS". A page card is the query `?t=<title>&s=<sub>`, a `|` breaking the
+sub, and a title wider than the centre square shrinks to fit.
+
+**THE BANNER IS STILL TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
 `assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what
 the masthead renders; `assets/onlyboosts_banner.png` is the same artwork
-flattened onto white and is the `og:image` on every page plus `OG_FALLBACK` on
-the four detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
-and both files move.**
+flattened onto white and was the `og:image` until the card replaced it. **Change
+the art and both files move.**
 
 The split is about who composites. The wordmark is brand cyan and nothing else
 (measured: 15% of the image is ink, all of it cyan), so on transparency it sits
 on whatever the page's background is — which is what makes a dark theme a
 palette change rather than a second banner. A **preview crawler** composites a
 transparent PNG onto a background it picks and never discloses, so a share card
-is the one surface where the flattened copy is the safe one. Only the clear file
+is the one surface where a flattened image is the safe one (the cards are opaque
+navy for that reason). Only the clear file
 is in `PRECACHE_URLS`: the opaque one is fetched by crawlers and never by a
 browser, so precaching it spent 93KB on every install for nothing.
 

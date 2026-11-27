@@ -41,15 +41,15 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v319'
-import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v319'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v319'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v319'
-import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v319'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v319'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v319'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v320'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v320'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v320'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v320'
+import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v320'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v320'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v320'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v319'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v320'
 
 const state = {
   pubkey: null,
@@ -585,7 +585,7 @@ async function exportOpml() {
 /** The import / manage panel, loaded on first use (opml-import.js). */
 async function openOpml(view) {
   try {
-    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v319')
+    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v320')
     if (!state.everRead) await reload()
     const pubkey = getSessionPubkey()
     openOpmlPanel({

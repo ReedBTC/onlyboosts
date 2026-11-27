@@ -63,7 +63,7 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // the ids existed can still copy a link to one. That last is why the ids are now
 // visible to people rather than only to whoever was told them, and it is also
 // why every one of them has to keep reading as a name for its section.
-const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
+const OG_FALLBACK = `${SITE_ORIGIN}/assets/og/onlyboosts.png`; // the generic preview card (assets/brand/og_card.html)
 
 // Guids are UUIDs at 36 chars; the cap leaves slack for the odd-but-real values
 // in the index without letting a kilobyte string reach a bound query.
@@ -549,20 +549,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v319" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v320" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v319" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v320" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -980,12 +980,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v319" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v319" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v320" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v320" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v319"></script>
-<script src="/assets/js/sw-register.js?v=ob-v319" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v320"></script>
+<script src="/assets/js/sw-register.js?v=ob-v320" defer></script>
 </body>
 </html>`;
 }
@@ -1545,10 +1545,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v319" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v319" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v320" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v320" />
 </head>
 <body>
 <section class="page-header">
@@ -1567,7 +1567,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v319" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v320" defer></script>
 </body>
 </html>`;
   return new Response(html, {

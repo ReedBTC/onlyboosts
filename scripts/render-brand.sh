@@ -32,11 +32,17 @@ shot $B/onlyboosts_bot_pfp_d5.svg  1024 1024 $B/nostr_pfp_boostbot.png
 shot $B/banner.html 1800 600 assets/onlyboosts_banner_clear.png
 sed 's/--ground:transparent/--ground:#ffffff/' $B/banner.html > "$TMP/white.html"; cp "$TMP/white.html" "$B/.banner_white.html"
 shot $B/.banner_white.html 1800 600 assets/onlyboosts_banner.png; rm -f "$B/.banner_white.html"
-# /charts/<year>'s link-preview card, one per year in YEAR_CARDS (functions/_shared/year-page.js).
-# Rendered in place (it loads ../fonts/outfit.woff2 and the mark beside it); the year is the hash.
-for y in 2026; do
+# The link-preview cards (assets/brand/og_card.html), 1200x630, rendered in place: the
+# template loads ../fonts/outfit.woff2 and the mark beside it. The generic card is every
+# page's og:image and the fallback of the image routes; a page card adds ?t=<title>&s=<sub>.
+card() { # out  query
   "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
-    --window-size=1200,630 --virtual-time-budget=2000 --screenshot=assets/og/charts-$y.png \
-    "file://$PWD/$B/og_charts_year.html#$y" >/dev/null 2>&1
-  echo assets/og/charts-$y.png
+    --window-size=1200,630 --virtual-time-budget=3000 --screenshot="$1" \
+    "file://$PWD/$B/og_card.html$2" >/dev/null 2>&1
+  echo "$1"
+}
+card assets/og/onlyboosts.png ""
+# /charts/<year>, one per year in YEAR_CARDS (functions/_shared/year-page.js).
+for y in 2026; do
+  card assets/og/charts-$y.png "?t=$y%20Charts&s=Top%2033%20Songs%2C%20Artists%2C%7CPodcasts%20and%20Boosters"
 done

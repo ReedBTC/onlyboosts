@@ -218,9 +218,10 @@ trust the values. `docs/dark-mode.md` has the rest.
 | Bot pubkey (hex) | `3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9` |
 
 **The bot is a second identity on purpose**: it signs notes for donors with no
-key, and a signing endpoint is an attack surface. The banner is two files:
-`onlyboosts_banner_clear.png` renders on the page, `onlyboosts_banner.png` is
-the `og:image`; change the art and both move. The domain is in `robots.txt`,
+key, and a signing endpoint is an attack surface. The masthead banner is
+`onlyboosts_banner_clear.png`; the `og:image` is the generic preview card
+`assets/og/onlyboosts.png` (since 2026-11-27), rendered with every page card
+from `assets/brand/og_card.html`, essentials in the centre square. The domain is in `robots.txt`,
 the manifest, the sitemap, the CORS allowlist, canonical/OG tags and the
 `client` tags; change them together.
 

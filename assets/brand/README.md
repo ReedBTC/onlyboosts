@@ -28,6 +28,7 @@ The `_d5_*.png` exports above are the rounded tile on transparency, kept as the 
 | `onlyboosts_favicon_d5.svg` | `assets/onlyboosts_favicon.png` (256) | favicon, the Log in button's mark; the small cut, a thicker outline and two arcs |
 | `onlyboosts_bot_pfp_d5.svg` | `nostr_pfp_boostbot.png` (1024) | the boost bot's kind 0 `picture`: the same mark, cyan on navy |
 | `banner.html` + `wordmark_clear.png` | `assets/onlyboosts_banner_clear.png`, `assets/onlyboosts_banner.png` (1800x600) | page banner and share cards (clear), `og:image` (white) |
+| `og_card.html` | `assets/og/onlyboosts.png`, `assets/og/charts-<year>.png` (1200x630) | the link-preview cards: the generic one is every page's `og:image` and the image routes' fallback since 2026-11-27; `?t=&s=` makes a page card |
 
 The profile pictures are full-bleed squares, because the nav, the Log in button and every Nostr client
 crop them to a circle; the mark is scaled to sit inside that circle. The wordmark is raster artwork
