@@ -13,11 +13,12 @@
 //      with ?supporters=1 — the Shows feed doesn't need it and it's a GROUP BY.
 //   3. `?corpus=1` answers something else entirely: every boost sent to this
 //      show, in one bounded response, and none of the above. See fetchShowCorpus.
-import { json, preflight, CREDITED_BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { json, preflight, corsHeaders, CREDITED_BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
 import { CREDITED } from "../../../_shared/credited.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 import { headOf } from "../../../_shared/head.js";
+import { podcastAlias, ALIAS_REDIRECT_CACHE } from "../../../_shared/podcast-alias.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // The busiest show in the index has 210 boosters, so this is a guard against a
@@ -43,7 +44,25 @@ export async function onRequestGet({ request, env, params }) {
     `SELECT podcast_guid, title, image, artwork, feed_url, medium, author, language, boost_count, total_sats,
             booster_count, episode_count, latest_ts FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
-  if (!show) return json(request, { error: "podcast not found" }, { status: 404 });
+  if (!show) {
+    // A retired guid answers with where it went, the same as /show/<guid>, and
+    // only on the miss. The query string rides along, so ?corpus=1 or
+    // ?supporters=1 asks the new guid the same question. A same-origin fetch
+    // follows it transparently; CORS headers go on the redirect because a
+    // cross-origin fetch checks them on every hop.
+    const alias = await podcastAlias(env, guid);
+    if (alias) {
+      return new Response(null, {
+        status: 301,
+        headers: {
+          Location: `/api/v1/podcasts/${encodeURIComponent(alias.guid)}${u.search}`,
+          "Cache-Control": ALIAS_REDIRECT_CACHE,
+          ...corsHeaders(request),
+        },
+      });
+    }
+    return json(request, { error: "podcast not found" }, { status: 404 });
+  }
 
   /* ── every boost to this show, one response ────────────────────────────────
    *
