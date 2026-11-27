@@ -70,6 +70,7 @@ export const PAGES = {
   },
   "movers": {
     title: "Podcast Movers of the Last Week",
+    card: "podcast-movers",
     og: "The podcasts climbing the OnlyBoosts Charts: the last 7 days against the 7 days before them, the biggest climbs first.",
     lead: "The last 7 days' Shows chart against the 7 days before them, to 100 places: the biggest climbs first, then the shows in the top 100 of the last 7 days that were not in the 7 days before. The rank is the show's place over the last 7 days.",
     rows: (env) => moversRows(env, 100),
@@ -136,6 +137,12 @@ export async function onRequestGet(context) {
     .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/discover/${esc(key)}" />`)
     .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${esc(page.title)} — OnlyBoosts" />`)
     .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(page.og)}" />`);
+  // A list with a preview card of its own (assets/og/<card>.png); the rest keep
+  // the generic card the shell carries.
+  if (page.card) {
+    html = html.replace(/<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${SITE}/assets/og/${page.card}.png" />`)
+      .replace(/<meta property="og:image:alt" content="[^"]*" \/>/, `<meta property="og:image:alt" content="OnlyBoosts ${esc(page.title)}" />`);
+  }
   return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
 }
 

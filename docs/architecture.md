@@ -511,7 +511,13 @@ from one template, `assets/brand/og_card.html`, by `scripts/render-brand.sh`.
 **Everything that matters sits inside the centre 600px**: Reed's report was
 mynostr.app cutting a square thumbnail out of the 3:1 banner and showing
 "Only BOOS". A page card is the query `?t=<title>&s=<sub>`, a `|` breaking the
-sub, and a title wider than the centre square shrinks to fit.
+sub, and a title wider than the centre square shrinks to fit. **The page cards**
+(Reed took all of them, 2026-11-27): `weekly-charts` (/charts), `podcast-charts`
+(/podcasts/*), `music-charts` (/music/*), `top-members` (/members), `boosts`
+(/boosts), named by `card` in `charts-page.js`'s META; `podcast-movers`
+(/discover/movers), named in `discover/[key].js`; `charts-<year>` by
+`YEAR_CARDS`. `test-head-routes.mjs` fails on any card a page names that is not
+in `assets/og/`.
 
 **THE BANNER IS STILL TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
 `assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what

@@ -57,16 +57,20 @@ export const PAGES = {
   charts: { views: [], feed: false },
 };
 
-/* The words each page wears: its <title>, canonical path and description. */
+/* The words each page wears: its <title>, canonical path and description, and
+ * its link-preview card, assets/og/<card>.png (2026-11-27, Reed: "i like all of
+ * them"). The cards render from assets/brand/og_card.html in
+ * scripts/render-brand.sh; a card named here must exist there, or the preview
+ * is a broken image, which test-head-routes.mjs checks. */
 const META = {
-  "podcasts/shows": { title: "Podcast Charts: Shows", path: "/podcasts/shows", desc: "Every podcast with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year, globally or from the accounts you follow." },
-  "podcasts/episodes": { title: "Podcast Charts: Episodes", path: "/podcasts/episodes", desc: "Every podcast episode with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year, globally or from the accounts you follow." },
-  "music/artists": { title: "Music Charts: Artists", path: "/music/artists", desc: "Every artist with a boost on Nostr, ranked by the OnlyBoosts Charts over their albums and songs." },
-  "music/albums": { title: "Music Charts: Albums", path: "/music/albums", desc: "Every album with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year." },
-  "music/songs": { title: "Music Charts: Songs", path: "/music/songs", desc: "Every song with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year." },
-  "boosts/members": { title: "Boosts", path: "/boosts", desc: "Every Podcasting 2.0 boost published to Nostr, as it was sent, newest first: read the boostagrams globally or from who you follow, and boost back with Lightning." },
-  "members/": { title: "Members", path: "/members", desc: "The members of OnlyBoosts: everyone who has boosted a podcast or musician and shared the boost with their Nostr identity, ranked, and the bots that publish boosts for apps that do not." },
-  "charts/": { title: "Weekly Charts", path: "/charts", desc: "The OnlyBoosts weekly charts: the Top 10 podcasts, songs and artists by Nostr boosts and the #40HPW Challenge, this week and every past week, and who has held #1 the longest." },
+  "podcasts/shows": { title: "Podcast Charts: Shows", path: "/podcasts/shows", card: "podcast-charts", desc: "Every podcast with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year, globally or from the accounts you follow." },
+  "podcasts/episodes": { title: "Podcast Charts: Episodes", path: "/podcasts/episodes", card: "podcast-charts", desc: "Every podcast episode with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year, globally or from the accounts you follow." },
+  "music/artists": { title: "Music Charts: Artists", path: "/music/artists", card: "music-charts", desc: "Every artist with a boost on Nostr, ranked by the OnlyBoosts Charts over their albums and songs." },
+  "music/albums": { title: "Music Charts: Albums", path: "/music/albums", card: "music-charts", desc: "Every album with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year." },
+  "music/songs": { title: "Music Charts: Songs", path: "/music/songs", card: "music-charts", desc: "Every song with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year." },
+  "boosts/members": { title: "Boosts", path: "/boosts", card: "boosts", desc: "Every Podcasting 2.0 boost published to Nostr, as it was sent, newest first: read the boostagrams globally or from who you follow, and boost back with Lightning." },
+  "members/": { title: "Members", path: "/members", card: "top-members", desc: "The members of OnlyBoosts: everyone who has boosted a podcast or musician and shared the boost with their Nostr identity, ranked, and the bots that publish boosts for apps that do not." },
+  "charts/": { title: "Weekly Charts", path: "/charts", card: "weekly-charts", desc: "The OnlyBoosts weekly charts: the Top 10 podcasts, songs and artists by Nostr boosts and the #40HPW Challenge, this week and every past week, and who has held #1 the longest." },
 };
 
 /* The opening feed each edge-rendered panel adopts, and it must match the
@@ -192,13 +196,17 @@ export function routeShell(html, route) {
     }
   }
 
-  // 4. The words: title, canonical, the Open Graph pair.
+  // 4. The words: title, canonical, the Open Graph tags, the preview card.
   html = html.replace(/<title>[^<]*<\/title>/, `<title>${esc(meta.title)} — OnlyBoosts</title>`)
     .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${SITE}${meta.path}" />`)
     .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}${meta.path}" />`)
     .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${esc(meta.title)} — OnlyBoosts" />`)
     .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(meta.desc)}" />`)
     .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${esc(meta.desc)}" />`);
+  if (meta.card) {
+    html = html.replace(/<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${SITE}/assets/og/${meta.card}.png" />`)
+      .replace(/<meta property="og:image:alt" content="[^"]*" \/>/, `<meta property="og:image:alt" content="OnlyBoosts ${esc(meta.title)}" />`);
+  }
   return html;
 }
 
