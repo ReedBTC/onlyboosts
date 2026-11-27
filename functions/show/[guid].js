@@ -38,6 +38,7 @@ import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 import { tileHtml, railListHtml } from "../../assets/js/rail-tile.js";
 
 import { headOf } from "../_shared/head.js";
+import { podcastAlias, ALIAS_REDIRECT_CACHE } from "../_shared/podcast-alias.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 
 // ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL. `/show/<guid>#podroll` is
@@ -108,7 +109,26 @@ export async function onRequestGet(context) {
   // The split moves as the collector repairs malformed show identifiers (927
   // of 1,285 qualified after its 2026-07-26 pass, up from 922 of 1,384), which
   // is why nothing here is counted or capped — the rule does the work.
-  if (!show || !show.title) return notFound(guid);
+  //
+  // A miss asks one more question before it 404s: whether the guid was
+  // retired into another (a show that moved feeds and declared a new
+  // podcast:guid, merged by Reed). Only here, so a page that exists never pays
+  // for it; the target is held to the same title rule, so the redirect cannot
+  // land on a second 404. See functions/_shared/podcast-alias.js.
+  if (!show || !show.title) {
+    const alias = await podcastAlias(env, guid);
+    if (alias?.title) {
+      const search = new URL(request.url).search;
+      return new Response(null, {
+        status: 301,
+        headers: {
+          Location: `/show/${encodeURIComponent(alias.guid)}${search}`,
+          "Cache-Control": ALIAS_REDIRECT_CACHE,
+        },
+      });
+    }
+    return notFound(guid);
+  }
 
   // The subject's own side of the medium partition, read once here because two
   // things below need it: the community rollup's WHERE clause, and copyFor()

@@ -311,7 +311,7 @@ one drawer.
 
 ### `/show/<guid>`
 
-Five sections beyond the shared chrome. The spec is the authority; four things
+Five sections beyond the shared chrome. The spec is the authority; five things
 that are not in it or that a change would break:
 
 - **The description is fetched per request, never stored.** Nothing in D1 or the
@@ -334,6 +334,21 @@ that are not in it or that a change would break:
   render. If the sections are missing everywhere, that is the thing to check first.
 - **`linked` is the collector's flag and is read, never re-derived.** True means
   the show has a page here; **44% are false** and link to BMB instead.
+- **⚠️ A merged guid answers 301 to the show it merged into** (2026-11-27). When a
+  show moves feeds and declares a new podcast:guid, Reed may merge the old guid
+  into the new one; the old `podcasts` row then leaves D1, and every shared
+  `/show/<old>` link would 404. On a miss, and only on a miss, the page reads
+  the collector's `podcast_aliases(from_guid, to_guid)` (about 1,000 rows,
+  flattened to one hop, replaced whole) joined to `podcasts`, and redirects
+  only when the target has a title, so it cannot hand over a second 404. The
+  query string rides along; a self-alias, a dangling alias and a missing table
+  are all the ordinary 404. `/api/v1/podcasts/<guid>` does the same with its
+  own rule (a row, title or not) and CORS headers on the redirect. **301, but
+  `max-age=3600`**: permanent for crawlers, bounded in browsers and at the edge,
+  because an alias's direction is a decision (Radio Detox folds the new guid
+  into the old) and a reversed one must not leave two cached redirects bouncing
+  a reader. `/episode`'s fallback stays a 302 for the opposite reason: its
+  answer is expected to stop being right. `scripts/test-podcast-alias.mjs`.
 
 Both podroll directions ship, and the reverse edge is why the section exists on
 109 pages rather than 65. Merging them into one grid was rejected: *I recommend
