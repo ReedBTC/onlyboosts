@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- The link-preview card for /charts/<year>, 1200x630 (the 1.91:1 that wide
+     previews use). Everything that matters sits in the centre 600px, because
+     some apps (mynostr.app, Reed's 2026-11-27 report) cut a square out of the
+     middle for a thumbnail, and the wide banner lost its logo that way.
+     The year comes from the hash: render it as og_charts_year.html#2026.
+     scripts/render-brand.sh renders it to assets/og/charts-<year>.png. -->
+<html><head><meta charset="utf-8"><style>
+  @font-face{font-family:'Outfit';font-weight:100 900;src:url('../fonts/outfit.woff2') format('woff2')}
+  html,body{margin:0;width:1200px;height:630px;background:#0b3a52;overflow:hidden}
+  .col{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       font-family:'Outfit',sans-serif;color:#ffffff;text-align:center}
+  .brand{display:flex;align-items:center;gap:18px}
+  .brand img{width:88px;height:88px;display:block}
+  .brand span{font-size:58px;font-weight:700;letter-spacing:-0.01em}
+  .brand b{color:#00aff0;font-weight:700}
+  h1{margin:26px 0 0;font-size:104px;font-weight:800;line-height:1;letter-spacing:-0.02em}
+  .rule{width:84px;height:5px;border-radius:3px;background:#00aff0;margin:30px 0 26px}
+  p{margin:0;font-size:31px;font-weight:500;line-height:1.3;color:rgba(255,255,255,0.82)}
+</style></head><body><div class="col">
+  <div class="brand"><img src="onlyboosts_mark_d5.svg" alt=""><span><b>Only</b>Boosts</span></div>
+  <h1><span id="y">2026</span> Charts</h1>
+  <div class="rule"></div>
+  <p>Top 33 Songs, Artists,<br>Podcasts and Boosters</p>
+</div><script>
+  var y = (location.hash || '').slice(1); if (/^\d{4}$/.test(y)) document.getElementById('y').textContent = y;
+</script></body></html>

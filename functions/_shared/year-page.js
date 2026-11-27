@@ -354,6 +354,15 @@ function figure(title, lead, body, foot) {
   return `<section class="yc-fig"><h2>${esc(title)}</h2>${lead ? `<p class="yc-lead">${lead}</p>` : ""}${body}${foot}</section>`;
 }
 
+/* ⚠️ THE YEARS WITH A PREVIEW CARD OF THEIR OWN (2026-11-27, Reed: the 2026
+ * link will be shared a lot, and mynostr.app's square thumbnail cut the wide
+ * banner down to "Only BOOS"). Each is assets/og/charts-<year>.png, rendered by
+ * scripts/render-brand.sh from assets/brand/og_charts_year.html#<year>, with
+ * its essentials inside the centre square so a cropped thumbnail still reads.
+ * A year is added here only once its PNG exists; an og:image that 404s is a
+ * blank preview, which is worse than the banner. */
+const YEAR_CARDS = new Set(["2026"]);
+
 export function yearHtml(d) {
   const y = d.year;
   const empty = "No Nostr boosts in this year yet.";
@@ -405,6 +414,12 @@ export async function renderYearPage({ request, env, waitUntil }, year) {
       .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/charts/${esc(year)}" />`)
       .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="OnlyBoosts ${esc(year)} Charts" />`)
       .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="The Top 33 songs, artists, podcasts and boosters of ${esc(year)} by Nostr boosts, and the year in numbers." />`);
+    // The year's own preview card, where one has been rendered (YEAR_CARDS);
+    // any other year keeps the site banner the shell carries.
+    if (YEAR_CARDS.has(String(year))) {
+      html = html.replace(/<meta property="og:image" content="[^"]*" \/>/,
+        `<meta property="og:image" content="${SITE}/assets/og/charts-${esc(year)}.png" />\n  <meta property="og:image:width" content="1200" />\n  <meta property="og:image:height" content="630" />\n  <meta property="og:image:alt" content="OnlyBoosts ${esc(year)} Charts" />`);
+    }
   } catch (err) {
     console.error("[year] boards failed", year, err);
   }

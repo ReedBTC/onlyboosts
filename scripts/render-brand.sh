@@ -32,3 +32,11 @@ shot $B/onlyboosts_bot_pfp_d5.svg  1024 1024 $B/nostr_pfp_boostbot.png
 shot $B/banner.html 1800 600 assets/onlyboosts_banner_clear.png
 sed 's/--ground:transparent/--ground:#ffffff/' $B/banner.html > "$TMP/white.html"; cp "$TMP/white.html" "$B/.banner_white.html"
 shot $B/.banner_white.html 1800 600 assets/onlyboosts_banner.png; rm -f "$B/.banner_white.html"
+# /charts/<year>'s link-preview card, one per year in YEAR_CARDS (functions/_shared/year-page.js).
+# Rendered in place (it loads ../fonts/outfit.woff2 and the mark beside it); the year is the hash.
+for y in 2026; do
+  "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+    --window-size=1200,630 --virtual-time-budget=2000 --screenshot=assets/og/charts-$y.png \
+    "file://$PWD/$B/og_charts_year.html#$y" >/dev/null 2>&1
+  echo assets/og/charts-$y.png
+done
