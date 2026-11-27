@@ -12,8 +12,21 @@
     "         Homegrown Hits feed and SXWorldwide), so prefer 'exact' when unsure.",
     "",
     "After editing this file, run `resolve-guids` then a FULL D1 reload so the",
-    "corrected mapping reaches the website (a delta won't recompute the old rows)."
+    "corrected mapping reaches the website (a delta won't recompute the old rows).",
+    "",
+    "'exact' also takes a REAL guid (2026-11-27): an old guid merged by hand onto the",
+    "publisher's new declared guid after a feed move (Reed's calls; docs/show-artwork.md).",
+    "'feeds' pins a show to the feed it now lives at when that feed's PI entry has another",
+    "guid and the old guid stays the page (Radio Detox). Neither needs a full D1 reload."
   ],
-  "exact": {},
-  "prefix": []
+  "exact": {
+    "5867d038-4913-5660-9eb0-e04d1f4d20b9": "2d1cc85e-cd60-5c4c-8855-db44da5dd9c5",
+    "1d8dd3c2-2348-5e1b-a9de-e7a2aa6bab76": "c90066e3-b9ca-4f6c-a939-95a7e884528a",
+    "bb910052-1155-5a5d-a7fe-424baf317818": "a59a6c9e-0753-5675-8a46-915744be3141",
+    "a82d1f80-acc3-5509-a3c2-02a3bea464bd": "36909558-fe6a-5b1e-b28c-04f08af5397c"
+  },
+  "prefix": [],
+  "feeds": {
+    "36909558-fe6a-5b1e-b28c-04f08af5397c": "https://api.riverside.com/hosting/f6mkszUD.rss"
+  }
 }
