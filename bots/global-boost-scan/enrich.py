@@ -175,12 +175,48 @@ def live_sibling(feed, key, secret, log=print):
     return None
 
 
-def resolve_show(podcast_guid, key, secret):
+def moved_entry(feed, moved_to, key, secret, log=print):
+    """The Podcast Index entry at the address the show's feed permanently
+    redirects to, when it is a DIFFERENT entry for the SAME podcast:guid and
+    answers; else None.
+
+    ⚠️ A MOVED FEED CAN LEAVE BYGUID ON A STALE ENTRY THAT STILL ANSWERS.
+    live_sibling covers the old entry going dead; this is the other half. When
+    a host submits the new address to PI before PI's crawler meets the 301 on
+    the old one, PI keeps both entries and byguid keeps answering the old one,
+    which PI still crawls THROUGH the redirect (lastHttpStatus 200) but has
+    stopped updating. Local Bitcoiners, Fountain to Podhome on 2026-11-25:
+    byguid named 7683299, last crawled two days earlier with the show cover on
+    every episode, while 8129640 at the Podhome address carried the new
+    per-episode art (BMB, which also reads byguid, showed the stale art too).
+    Measured over every boosted show the same day: four such pairs, every one
+    a 301 chain. A redirect that lands on a different podcast:guid is a
+    different show to PI and is never taken here."""
+    if not moved_to or moved_to == feed.get("url"):
+        return None
+    try:
+        cand = pi_get("podcasts/byfeedurl", {"url": moved_to}, key, secret).get("feed") or {}
+    except Exception as e:
+        log(f"  [warn] PI byfeedurl lookup failed for {moved_to}: {e}")
+        return None
+    if (cand.get("id") and cand["id"] != feed.get("id")
+            and cand.get("podcastGuid") == feed.get("podcastGuid") and feed_answers(cand)):
+        log(f"  show {feed.get('podcastGuid')}: feed moved to {moved_to}; taking PI entry "
+            f"{cand['id']} over byguid's {feed.get('id')}")
+        return cand
+    return None
+
+
+def resolve_show(podcast_guid, key, secret, moved_to=None):
+    """`moved_to` is shows.feed_moved_to (db.record_feed_move); only the show
+    refresh passes it, the one caller that re-reads rows we already have."""
     try:
         feed = (pi_get("podcasts/byguid", {"guid": podcast_guid}, key, secret)
                 .get("feed") or {})
         if feed and not feed_answers(feed):
             feed = live_sibling(feed, key, secret) or feed
+        if feed:
+            feed = moved_entry(feed, moved_to, key, secret) or feed
         show = _show_from_feed(feed, podcast_guid)
     except Exception as e:
         print(f"  [warn] PI show lookup failed for {podcast_guid}: {e}")

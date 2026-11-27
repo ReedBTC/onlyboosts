@@ -153,17 +153,30 @@ def parse_publisher(xml):
     return None
 
 
-def fetch_feed_head(url, session):
-    """Stream a feed until the channel header is done. Returns (status, text).
+PERMANENT = (301, 308)
 
-    `text` is None for any non-200. Stops at `</channel>` (nothing channel-level
-    follows it) or at CAP_BYTES, whichever comes first.
+
+def moved_to(resp):
+    """Where a fetch landed, when every hop to it was a permanent redirect; else
+    None. A host's own 302 to a CDN or a "destinations" URL (Libsyn: 15 of the
+    78 redirects measured 2026-11-27) is how it serves the feed, not a move,
+    and a 302 anywhere in the chain disqualifies it."""
+    if resp.history and all(h.status_code in PERMANENT for h in resp.history):
+        return resp.url
+    return None
+
+
+def fetch_feed_head(url, session):
+    """Stream a feed until the channel header is done. Returns (status, text,
+    moved_to): `text` is None for any non-200; `moved_to` is `moved_to(resp)`.
+    Stops at `</channel>` (nothing channel-level follows it) or at CAP_BYTES,
+    whichever comes first.
     """
     resp = session.get(url, headers=UA, timeout=TIMEOUT, stream=True)
     status = resp.status_code
     try:
         if status != 200:
-            return status, None
+            return status, None, None
         parts, n = [], 0
         for chunk in resp.iter_content(chunk_size=65536):
             if not chunk:
@@ -172,7 +185,7 @@ def fetch_feed_head(url, session):
             n += len(parts[-1])
             if "</channel>" in parts[-1] or n >= CAP_BYTES:
                 break
-        return status, "".join(parts)
+        return status, "".join(parts), moved_to(resp)
     finally:
         resp.close()
 
@@ -181,10 +194,10 @@ def _probe_one(row, session):
     """One feed → a result dict. Never raises: a failure is a recorded status."""
     guid, url = row["podcast_guid"], row["feed_url"]
     out = {"podcast_guid": guid, "feed_url": url, "status": None, "items": None,
-           "publisher": None}
+           "publisher": None, "moved_to": None}
     for attempt in range(RETRY_429 + 1):
         try:
-            status, text = fetch_feed_head(url, session)
+            status, text, out["moved_to"] = fetch_feed_head(url, session)
             if status == 429 and attempt < RETRY_429:
                 time.sleep(2 ** attempt * 3)
                 continue

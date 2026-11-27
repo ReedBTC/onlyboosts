@@ -50,7 +50,9 @@ def run(byguid, byitunes=None, search=None, byfeedid=None):
 
 print("live byguid answer: taken as-is, one call")
 show, calls = run({**DEAD, "lastHttpStatus": 200})
-check(show["feed_id"] == 4866432 and calls == ["podcasts/byguid"], "no sibling probe when the feed answers")
+# episodes/byfeedid is resolve_show's newest-item read (2026-10-29), not a probe.
+check(show["feed_id"] == 4866432 and [c for c in calls if c.startswith("podcasts/")] == ["podcasts/byguid"],
+      "no sibling probe when the feed answers")
 
 print("dead byguid answer, live sibling by itunesId: the sibling, read in full")
 show, calls = run(DEAD, byitunes=LIVE_THIN, byfeedid=LIVE_FULL)

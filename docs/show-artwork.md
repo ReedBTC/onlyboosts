@@ -136,3 +136,23 @@ when it names the same `podcastGuid` and answers, and re-read in full through
 pins the rule. Measured over the 388 shows boosted in the prior 120 days it was
 the only show in this state; seven others sit on PI status 667 with no sibling.
 
+**The other half: a stale entry that still answers.** Found 2026-11-27 on Local
+Bitcoiners, moved from Fountain to Podhome on 11-25 with a 301. Podhome had
+submitted the new address, so Podcast Index held two entries under one guid,
+and `byguid` kept answering the old one (7683299). That entry still answers,
+because PI crawls it through the redirect, but it had stopped updating: every
+episode carried the show cover while the new entry (8129640) had the new
+per-episode art. BoostMeBitch, which also reads `byguid`, showed the same stale
+art. So the podroll sweep, which already fetches every boosted feed, records
+where a feed lands when every hop is a 301 or 308 (`shows.feed_moved_to`; a 302
+is a host serving its feed, not a move). The show refresh passes that to
+`enrich.resolve_show`, which takes the PI entry at that address
+(`podcasts/byfeedurl`) when it is a different entry naming the same guid and
+answering (`moved_entry`). Episodes follow, because they are read through the
+show's stored feed id. A redirect that lands on a different guid is a
+different show to PI and is never taken here; it is a question for the alias
+table. Measured over all 1,728 boosted shows that day: four such pairs (Local
+Bitcoiners, Bitcoin Rails, Nightmares, Dr. Fernando Morales Podcast), every
+one a 301 chain, and seven moves onto a new guid. Wavlake rate-limited 276
+music feeds out of that measurement. `test_enrich_moved.py` pins the rule.
+
