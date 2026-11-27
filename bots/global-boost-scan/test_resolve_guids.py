@@ -58,6 +58,26 @@ with tempfile.TemporaryDirectory() as tmp:
     print("a real guid is never touched")
     check(resolve_guids.derive(conn, SHOW, "k", "s", curated) is None, "real guid passes through")
 
+    print("a curated exact entry merges a real guid by hand (moved feed, new declared guid)")
+    NEW = "a59a6c9e-0753-5675-8a46-915744be3141"
+    hand = {"exact": {SHOW: NEW}, "prefix": [], "feeds": {}}
+    check(resolve_guids.derive(conn, SHOW, "k", "s", hand) == (NEW, "curated", None), "old → new")
+    check(resolve_guids.derive(conn, SHOW, "k", "s", {**hand, "exact": {SHOW: SHOW}}) is None,
+          "an entry naming itself is no merge")
+
+    print("apply_aliases follows a chain: phantom -> old guid -> new guid")
+    db.upsert_alias(conn, "chainraw-1", SHOW, "curated")
+    db.upsert_alias(conn, SHOW, NEW, "curated")
+    conn.execute("""INSERT INTO boosts (event_id, booster_pubkey, created_at, sats, podcast_guid)
+                    VALUES ('evchain','pk',?,1,'chainraw-1')""", (NOW,))
+    db.apply_aliases(conn)
+    got = conn.execute("SELECT canonical_guid FROM boosts WHERE event_id='evchain'").fetchone()[0]
+    check(got == NEW, f"the phantom's boost lands on the end guid ({got})")
+    conn.execute("DELETE FROM boosts WHERE event_id='evchain'")
+    conn.execute("DELETE FROM guid_aliases WHERE raw_guid IN ('chainraw-1', ?)", (SHOW,))
+    conn.execute("UPDATE boosts SET canonical_guid=NULL WHERE podcast_guid=?", (SHOW,))
+    conn.commit()
+
     print("resolve_all materializes it onto the boost and re-asks the rest next time")
     new, rekeyed = resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
     row = conn.execute("SELECT canonical_guid FROM boosts WHERE event_id='ev0'").fetchone()

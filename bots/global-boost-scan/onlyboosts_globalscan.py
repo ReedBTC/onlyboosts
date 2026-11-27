@@ -965,8 +965,10 @@ def _refresh_shows(conn, key, secret):
     print(f"Refreshing {len(shows)} show(s) via Podcast Index "
           f"({recent_due} recent, {old_due} dormant due)...")
     changed = missed = 0
+    pins = resolve_guids.load_curated()["feeds"]
     for pg in shows:
-        info = enrich.resolve_show(pg, key, secret, moved_to=db.feed_moved_to(conn, pg))
+        info = enrich.resolve_show(pg, key, secret, moved_to=db.feed_moved_to(conn, pg),
+                                   pinned_feed=pins.get(pg))
         if info:
             changed += bool(db.upsert_show(conn, info))
         else:

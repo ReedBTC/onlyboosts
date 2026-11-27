@@ -56,18 +56,27 @@ def is_uuid(v):
 
 
 def load_curated():
-    """Curated freeform map: {"exact": {raw: canonical}, "prefix": [{prefix, canonical}]}.
-    Absent/broken file → empty map (curation is optional)."""
+    """Curated map: {"exact": {raw: canonical}, "prefix": [{prefix, canonical}],
+    "feeds": {podcast_guid: feed_url}}. Absent/broken file → empty map.
+
+    `exact` also takes a REAL guid since 2026-11-27: a show whose feed moved and
+    whose publisher declared a new podcast:guid is merged by hand, old onto new
+    (Reed's call per show; derive() reads `exact` before the is-a-uuid test).
+    `feeds` pins a show to the feed it now lives at when that feed has a
+    different guid in Podcast Index and the old guid stays the page (Radio
+    Detox, whose new feed declares no guid of its own): the show refresh reads
+    the PI entry at that URL and keeps our guid."""
     if not CURATED_PATH.exists():
-        return {"exact": {}, "prefix": []}
+        return {"exact": {}, "prefix": [], "feeds": {}}
     try:
         c = json.loads(CURATED_PATH.read_text())
         c.setdefault("exact", {})
         c.setdefault("prefix", [])
+        c.setdefault("feeds", {})
         return c
     except Exception as e:
         print(f"  [warn] could not read {CURATED_PATH.name}: {e}")
-        return {"exact": {}, "prefix": []}
+        return {"exact": {}, "prefix": [], "feeds": {}}
 
 
 def _curated_lookup(raw_guid, curated):
@@ -88,6 +97,9 @@ def derive(conn, raw_guid, key, secret, curated):
     clean guid or can't be resolved. `show_dict` (when a PI lookup produced it) is
     an enrich.resolve_show-shaped dict the caller can cache, sparing a later call.
     """
+    hit = curated["exact"].get(raw_guid)
+    if hit and hit != raw_guid:
+        return hit, "curated", None                   # a hand merge, real guids included
     if is_uuid(raw_guid):
         return None                                   # already a real guid
 
@@ -145,6 +157,14 @@ def resolve_all(conn, key, secret, log=print):
     """Resolve every un-aliased phantom guid, then materialize aliases onto boosts.
     Returns (new_aliases, rekeyed_boosts)."""
     curated = load_curated()
+    # A hand merge is recorded whether or not a boost names the guid AS SIGNED:
+    # Abel James Show (Video)'s guid was only ever the canonical end of
+    # Fountain's own aliases, so the per-raw-guid loop below never met it.
+    # apply_aliases then follows the chain.
+    have = dict(conn.execute("SELECT raw_guid, canonical_guid FROM guid_aliases"))
+    for raw, canon in curated["exact"].items():
+        if canon and canon != raw and have.get(raw) != canon:
+            db.upsert_alias(conn, raw, canon, "curated")
     raw_guids = db.raw_guids_needing_alias(conn)
     log(f"Resolving {len(raw_guids)} un-aliased guid(s)...")
     by_method = {}

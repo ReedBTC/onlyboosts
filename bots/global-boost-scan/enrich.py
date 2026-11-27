@@ -175,7 +175,7 @@ def live_sibling(feed, key, secret, log=print):
     return None
 
 
-def moved_entry(feed, moved_to, key, secret, log=print):
+def moved_entry(feed, moved_to, key, secret, log=print, pinned=False):
     """The Podcast Index entry at the address the show's feed permanently
     redirects to, when it is a DIFFERENT entry for the SAME podcast:guid and
     answers; else None.
@@ -191,7 +191,9 @@ def moved_entry(feed, moved_to, key, secret, log=print):
     per-episode art (BMB, which also reads byguid, showed the stale art too).
     Measured over every boosted show the same day: four such pairs, every one
     a 301 chain. A redirect that lands on a different podcast:guid is a
-    different show to PI and is never taken here."""
+    different show to PI and is never taken here, unless `pinned`: a hand
+    decision (resolve_guids `feeds`) that the show lives at that URL whatever
+    guid PI files it under."""
     if not moved_to or moved_to == feed.get("url"):
         return None
     try:
@@ -199,23 +201,26 @@ def moved_entry(feed, moved_to, key, secret, log=print):
     except Exception as e:
         log(f"  [warn] PI byfeedurl lookup failed for {moved_to}: {e}")
         return None
-    if (cand.get("id") and cand["id"] != feed.get("id")
-            and cand.get("podcastGuid") == feed.get("podcastGuid") and feed_answers(cand)):
+    if (cand.get("id") and cand["id"] != feed.get("id") and feed_answers(cand)
+            and (pinned or cand.get("podcastGuid") == feed.get("podcastGuid"))):
         log(f"  show {feed.get('podcastGuid')}: feed moved to {moved_to}; taking PI entry "
             f"{cand['id']} over byguid's {feed.get('id')}")
         return cand
     return None
 
 
-def resolve_show(podcast_guid, key, secret, moved_to=None):
-    """`moved_to` is shows.feed_moved_to (db.record_feed_move); only the show
-    refresh passes it, the one caller that re-reads rows we already have."""
+def resolve_show(podcast_guid, key, secret, moved_to=None, pinned_feed=None):
+    """`moved_to` is shows.feed_moved_to (db.record_feed_move), `pinned_feed` a
+    curated `feeds` entry, which wins and may cross guids; only the show
+    refresh passes them, the one caller that re-reads rows we already have."""
     try:
         feed = (pi_get("podcasts/byguid", {"guid": podcast_guid}, key, secret)
                 .get("feed") or {})
         if feed and not feed_answers(feed):
             feed = live_sibling(feed, key, secret) or feed
-        if feed:
+        if pinned_feed:
+            feed = moved_entry(feed, pinned_feed, key, secret, pinned=True) or feed
+        elif feed:
             feed = moved_entry(feed, moved_to, key, secret) or feed
         show = _show_from_feed(feed, podcast_guid)
     except Exception as e:
