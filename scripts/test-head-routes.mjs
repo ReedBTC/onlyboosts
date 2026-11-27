@@ -127,4 +127,32 @@ check('no Function passes the incoming request as the init of an ASSETS fetch', 
   })
 }
 
+/* 2026-11-27: every page names its link-preview card, and an og:image that
+ * 404s is a blank preview, worse than the generic card. So: every og:image a
+ * shell or a Function names under /assets/og/ is a file in assets/og/, and the
+ * chart pages' rendered heads carry their own card. */
+console.log('\nEvery preview card a page names exists:')
+{
+  const named = new Set()
+  const scan = (src) => { for (const m of src.matchAll(/assets\/og\/([a-z0-9-]+)\.png/g)) named.add(m[1]) ; for (const m of src.matchAll(/card: "([a-z0-9-]+)"/g)) named.add(m[1]) }
+  for (const f of readdirSync(ROOT).filter((n) => n.endsWith('.html'))) scan(readFileSync(join(ROOT, f), 'utf8'))
+  for (const f of walk(FUNCTIONS)) scan(readFileSync(f, 'utf8'))
+  // The year cards are named by a template; YEAR_CARDS lists the years.
+  const years = /const YEAR_CARDS = new Set\(\[([^\]]*)\]\)/.exec(readFileSync(join(FUNCTIONS, '_shared', 'year-page.js'), 'utf8'))
+  for (const y of (years?.[1] || '').match(/\d{4}/g) || []) named.add(`charts-${y}`)
+  check(`the ${named.size} cards named are all in assets/og/`, () => {
+    assert.ok(named.size >= 8, `found ${named.size}: ${[...named]}`)
+    const missing = [...named].filter((n) => !n.includes('$') && !statSync(join(ROOT, 'assets', 'og', `${n}.png`), { throwIfNoEntry: false }))
+    assert.deepEqual(missing, [])
+  })
+  const { routeShell, resolveRoute } = await import('../functions/_shared/charts-page.js')
+  const shell = readFileSync(join(ROOT, 'charts.html'), 'utf8')
+  for (const [page, view, card] of [['podcasts', 'shows', 'podcast-charts'], ['music', 'songs', 'music-charts'], ['boosts', 'members', 'boosts'], ['members', undefined, 'top-members'], ['charts', undefined, 'weekly-charts']]) {
+    check(`/${page}${view ? '/' + view : ''} previews as ${card}.png`, () => {
+      const html = routeShell(shell, resolveRoute(page, view))
+      assert.match(html, new RegExp(`<meta property="og:image" content="https://onlyboosts\\.social/assets/og/${card}\\.png" />`))
+    })
+  }
+}
+
 console.log(`\n${failed ? `${failed} FAILED, ` : ''}${passed} passed`)

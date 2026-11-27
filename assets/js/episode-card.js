@@ -42,14 +42,14 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v321'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v321'
-import { episodeBoostLink } from './episode-link.js?v=ob-v321'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v321'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v321'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v321'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v321'
-import { splitLineHtml } from './boost-list.js?v=ob-v321'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v322'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v322'
+import { episodeBoostLink } from './episode-link.js?v=ob-v322'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v322'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v322'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v322'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v322'
+import { splitLineHtml } from './boost-list.js?v=ob-v322'
 
 const esc = htmlEscape
 

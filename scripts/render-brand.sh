@@ -46,3 +46,11 @@ card assets/og/onlyboosts.png ""
 for y in 2026; do
   card assets/og/charts-$y.png "?t=$y%20Charts&s=Top%2033%20Songs%2C%20Artists%2C%7CPodcasts%20and%20Boosters"
 done
+# The page cards (2026-11-27): META[...].card in functions/_shared/charts-page.js and
+# the movers list in functions/discover/[key].js name these files.
+card assets/og/weekly-charts.png  "?t=Weekly%20Charts&s=This%20Week%E2%80%99s%20Top%2010%20Podcasts%2C%7CSongs%20and%20Artists"
+card assets/og/podcast-charts.png "?t=Podcast%20Charts&s=Every%20Show%20and%20Episode%7CRanked%20by%20Nostr%20Boosts"
+card assets/og/music-charts.png   "?t=Music%20Charts&s=Every%20Song%2C%20Album%20and%20Artist%7CRanked%20by%20Nostr%20Boosts"
+card assets/og/top-members.png    "?t=Top%20Members&s=The%20Members%20Who%20Boost%7Cthe%20Most%20Podcasts%20and%20Music"
+card assets/og/boosts.png         "?t=Boosts&s=Every%20Boost%20Shared%20on%20Nostr%2C%7CAs%20It%20Is%20Sent"
+card assets/og/podcast-movers.png "?t=Podcast%20Movers&s=The%20Podcasts%20Climbing%20the%20Charts%7COver%20the%20Last%207%20Days"
