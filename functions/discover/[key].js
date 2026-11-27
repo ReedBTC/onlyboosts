@@ -126,14 +126,16 @@ export async function onRequestGet(context) {
     const start = html.indexOf(OPEN);
     const end = html.indexOf(CLOSE);
     if (start !== -1 && end > start) html = html.slice(0, start) + block + html.slice(end + CLOSE.length);
-    html = html.replace("<title>Discover — OnlyBoosts</title>", `<title>${esc(page.title)} — OnlyBoosts</title>`)
-      .replace(`<link rel="canonical" href="${SITE}/discover" />`, `<link rel="canonical" href="${SITE}/discover/${esc(key)}" />`)
-      .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/discover/${esc(key)}" />`)
-      .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${esc(page.title)} — OnlyBoosts" />`)
-      .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(page.og)}" />`);
   } catch (err) {
     console.warn("[discover] list not rendered", key, err);
   }
+  // The head is the list's even when its rows fail (2026-11-27): a preview
+  // fetcher keeps the first title and card it gets.
+  html = html.replace("<title>Discover — OnlyBoosts</title>", `<title>${esc(page.title)} — OnlyBoosts</title>`)
+    .replace(`<link rel="canonical" href="${SITE}/discover" />`, `<link rel="canonical" href="${SITE}/discover/${esc(key)}" />`)
+    .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${SITE}/discover/${esc(key)}" />`)
+    .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${esc(page.title)} — OnlyBoosts" />`)
+    .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${esc(page.og)}" />`);
   return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
 }
 
